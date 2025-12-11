@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Quote, X, CreditCard, CheckCircle, Smartphone, Landmark, Banknote } from 'lucide-react';
+import { X, CreditCard, CheckCircle, Smartphone, Landmark, Banknote } from 'lucide-react';
+import { Quote } from '../types';
 
 interface PaymentModalProps {
   quote: Quote | null;

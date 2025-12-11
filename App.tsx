@@ -22,6 +22,7 @@ import { ScheduleModal } from './components/ScheduleModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
+import { LandingPage } from './components/LandingPage';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ServiceType>(ServiceType.RIDE);
@@ -29,6 +30,9 @@ const App: React.FC = () => {
   
   // Theme State
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Landing Page State
+  const [showLanding, setShowLanding] = useState(true);
 
   // Apply Dark Mode Class to HTML/Body
   useEffect(() => {
@@ -119,6 +123,16 @@ const App: React.FC = () => {
     }
     return () => clearInterval(interval);
   }, [activeTrip, pickupCoords]);
+
+  const handleUserLogin = (u: User) => {
+    setUser(u);
+    setShowLanding(false); // Move to app
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setShowLanding(true); // Back to landing
+  };
 
   const handleLocationSelect = (type: 'pickup' | 'dropoff', location: Location) => {
     if (type === 'pickup') {
@@ -643,6 +657,23 @@ const App: React.FC = () => {
       </div>
     );
   };
+  
+  if (showLanding && !user) {
+    return (
+      <>
+        <LandingPage 
+          onLoginClick={() => setIsAuthOpen(true)}
+          onRegisterClick={() => setIsAuthOpen(true)}
+          onGuestAccess={() => setShowLanding(false)}
+        />
+        <AuthModal 
+          isOpen={isAuthOpen} 
+          onClose={() => setIsAuthOpen(false)} 
+          onLogin={handleUserLogin} 
+        />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex flex-col font-sans text-slate-900 dark:text-white transition-colors duration-300">
@@ -735,7 +766,7 @@ const App: React.FC = () => {
                  <History size={18} />
                </button>
 
-               <button onClick={() => setUser(null)} className="bg-gray-100 dark:bg-slate-800 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors">
+               <button onClick={handleLogout} className="bg-gray-100 dark:bg-slate-800 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors">
                  <LogOut size={18} />
                </button>
              </div>
@@ -816,7 +847,7 @@ const App: React.FC = () => {
       <AuthModal 
         isOpen={isAuthOpen} 
         onClose={() => setIsAuthOpen(false)} 
-        onLogin={setUser} 
+        onLogin={handleUserLogin} 
       />
       <PaymentModal 
         isOpen={isPaymentOpen} 
