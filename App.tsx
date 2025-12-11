@@ -4,7 +4,8 @@ import {
   User as UserIcon, ChevronRight, Search, 
   AlertCircle, Filter, Clock, Leaf, DollarSign,
   MessageSquare, Zap, LogOut, Settings, History,
-  Bike, Train, Package, Globe, Plus, Trash2, Calendar, Users, Map as MapIcon, Shield, HelpCircle
+  Bike, Train, Package, Globe, Plus, Trash2, Calendar, Users, Map as MapIcon, Shield, HelpCircle,
+  Locate
 } from 'lucide-react';
 import { MOCK_QUOTES } from './constants';
 import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider } from './types';
@@ -53,6 +54,7 @@ const App: React.FC = () => {
   const [stops, setStops] = useState<{id: string, value: string, coords: Location | null}[]>([]);
   const [pickupCoords, setPickupCoords] = useState<Location | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<Location | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
   
   // Search & Result State
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
@@ -149,6 +151,34 @@ const App: React.FC = () => {
       setDropoff(location.address);
     }
     setError(null);
+  };
+
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const location: Location = {
+          lat: latitude,
+          lng: longitude,
+          address: "Current Location"
+        };
+        setPickupCoords(location);
+        setPickup("Current Location");
+        setIsLocating(false);
+        setError(null);
+      },
+      (err) => {
+        console.error(err);
+        setError("Unable to retrieve your location. Please check permissions.");
+        setIsLocating(false);
+      }
+    );
   };
 
   const handleAddStop = () => {
@@ -248,10 +278,11 @@ const App: React.FC = () => {
     }
   };
 
+  // Pricing Logic with 5% Margin and Distance Calculation
   const processedQuotes = useMemo(() => {
     let quotes = [...MOCK_QUOTES];
     
-    // Simplified Filtering Logic
+    // Filtering Logic
     if (vehicleFilter !== 'all') {
       if (vehicleFilter === 'private') {
          quotes = quotes.filter(q => ['standard', 'luxury', 'eco', 'van'].includes(q.category));
@@ -264,27 +295,85 @@ const App: React.FC = () => {
       }
     }
 
-    // Filter by Sharing
     if (isSharedRide) {
       quotes = quotes.filter(q => q.canShare);
     }
-    
-    // Apply Modifications (Surge, Stops, Share discount, Promo Code, Delivery Flex)
+
+    // Dynamic Pricing Variables
+    const PLATFORM_MARGIN = 1.05; // 5% Margin Increase
+    const RATES: Record<string, { base: number, perKm: number, perMin: number }> = {
+      standard: { base: 2.50, perKm: 1.25, perMin: 0.30 },
+      luxury: { base: 5.00, perKm: 2.75, perMin: 0.60 },
+      delivery: { base: 3.50, perKm: 1.10, perMin: 0.15 },
+      eco: { base: 2.80, perKm: 1.15, perMin: 0.25 },
+      transit: { base: 2.50, perKm: 0.10, perMin: 0 }, // Transit usually flat or low var
+      scooter: { base: 1.00, perKm: 0.40, perMin: 0.20 },
+      bicycle: { base: 1.00, perKm: 0.60, perMin: 0.15 },
+      water: { base: 12.00, perKm: 3.50, perMin: 0 },
+      van: { base: 10.00, perKm: 2.20, perMin: 0.45 },
+    };
+
+    // Calculate Distance (Simulated Haversine)
+    let distanceKm = 4.5; // Default fallback distance
+    if (pickupCoords?.lat && dropoffCoords?.lat) {
+       const R = 6371; // km
+       const dLat = (dropoffCoords.lat - pickupCoords.lat) * Math.PI / 180;
+       const dLon = (dropoffCoords.lng - pickupCoords.lng) * Math.PI / 180;
+       const a = 
+         Math.sin(dLat/2) * Math.sin(dLat/2) +
+         Math.cos(pickupCoords.lat * Math.PI / 180) * Math.cos(dropoffCoords.lat * Math.PI / 180) * 
+         Math.sin(dLon/2) * Math.sin(dLon/2);
+       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+       distanceKm = R * c;
+    }
+    // Enforce minimum distance for realistic pricing
+    distanceKm = Math.max(1.5, distanceKm);
+
+    // Modifiers
     const stopMultiplier = 1 + (stops.length * 0.15);
     const shareDiscount = isSharedRide ? 0.8 : 1;
     const deliveryFlexDiscount = (activeTab === ServiceType.DELIVERY && isFlexibleDelivery) ? 0.85 : 1;
     const totalDiscountMultiplier = (1 - activeDiscount) * shareDiscount * deliveryFlexDiscount;
 
     quotes = quotes.map(q => {
-      const originalPrice = q.price * stopMultiplier;
-      const finalPrice = originalPrice * totalDiscountMultiplier;
+      // 1. Calculate Base Cost based on Category Rates and Distance
+      const rate = RATES[q.category] || RATES.standard;
       
+      // Speed factors for ETA
+      let speedKmh = 30;
+      if (q.category === 'scooter' || q.category === 'bicycle') speedKmh = 15;
+      if (q.category === 'transit') speedKmh = 25;
+      if (q.category === 'luxury') speedKmh = 35;
+      
+      const rawEta = (distanceKm / speedKmh) * 60; // minutes
+      const estimatedDurationMin = rawEta + 3; // +3 min buffer
+
+      // Base Price Formula: Base + (Dist * Rate) + (Time * Rate)
+      let dynamicPrice = rate.base + (rate.perKm * distanceKm) + (rate.perMin * estimatedDurationMin);
+
+      // 2. Provider Variance (Simulation)
+      // Uber/Lyft/Teleport might have slightly different algos. 
+      // Teleport is cheaper (Competitive Advantage)
+      if (q.provider === ServiceProvider.UBER) dynamicPrice *= 1.1; 
+      if (q.provider === ServiceProvider.LYFT) dynamicPrice *= 1.08; 
+      if (q.provider === ServiceProvider.TELEPORT) dynamicPrice *= 0.95; 
+
+      // 3. Apply Traffic Surge
       let etaMultiplier = trafficSurge * (isSharedRide ? 1.2 : 1);
-      if (activeTab === ServiceType.DELIVERY && isFlexibleDelivery) etaMultiplier *= 2; // Slower delivery for flex
+      if (activeTab === ServiceType.DELIVERY && isFlexibleDelivery) etaMultiplier *= 2; 
+
+      dynamicPrice = dynamicPrice * trafficSurge;
+
+      // 4. Apply Platform Margin (5% increase)
+      dynamicPrice = dynamicPrice * PLATFORM_MARGIN;
+
+      // 5. Apply User Discounts / Modifiers
+      const originalPrice = dynamicPrice * stopMultiplier;
+      const finalPrice = originalPrice * totalDiscountMultiplier;
 
       return {
         ...q,
-        eta: Math.round(q.eta * etaMultiplier), 
+        eta: Math.round(rawEta * etaMultiplier), 
         price: finalPrice,
         originalPrice: finalPrice < originalPrice ? originalPrice : undefined,
         vehicleType: isSharedRide ? `${q.vehicleType} (Shared)` : q.vehicleType
@@ -323,7 +412,7 @@ const App: React.FC = () => {
       }
     });
     return quotes;
-  }, [sortBy, vehicleFilter, trafficSurge, stops.length, isSharedRide, activeDiscount, isFlexibleDelivery, activeTab]);
+  }, [sortBy, vehicleFilter, trafficSurge, stops.length, isSharedRide, activeDiscount, isFlexibleDelivery, activeTab, pickupCoords, dropoffCoords]);
 
   const renderContent = () => {
     // Admin View
@@ -456,8 +545,16 @@ const App: React.FC = () => {
                         placeholder="Pickup location"
                         value={pickup}
                         onChange={(e) => { setPickup(e.target.value); if(e.target.value === '') setPickupCoords(null); }}
-                        className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && pickup.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
+                        className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-10 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && pickup.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
                       />
+                      <button 
+                        type="button" 
+                        onClick={handleGetCurrentLocation}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+                        title="Use Current Location"
+                      >
+                        {isLocating ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div> : <Locate size={18} />}
+                      </button>
                       <div className="absolute left-[15px] top-8 w-[2px] h-8 bg-gray-200 dark:bg-slate-700 -z-10 group-focus-within:bg-slate-300"></div>
                     </div>
 

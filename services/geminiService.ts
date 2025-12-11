@@ -21,7 +21,8 @@ export const generateLogisticsAdvice = async (
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `
-        You are an expert logistics coordinator for a high-end delivery and ride-sharing aggregator platform called SwiftLink.
+        You are "Tele", an expert logistics coordinator and AI assistant for the Teleport platform.
+        Teleport is a high-end delivery and ride-sharing aggregator.
         
         Context about the user's business/situation:
         ${context}
@@ -31,6 +32,7 @@ export const generateLogisticsAdvice = async (
 
         Provide a concise, professional, and actionable response. Focus on cost-saving, route optimization, and efficiency.
         If the user asks about specific prices, simulate an intelligent estimate based on market trends (Uber/Lyft).
+        Keep your tone helpful, futuristic, and efficient.
       `,
     });
     return response.text || "No advice generated.";
