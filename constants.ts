@@ -10,7 +10,8 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'UberX',
     ecoScore: 4,
     surged: true,
-    category: 'standard'
+    category: 'standard',
+    canShare: true
   },
   {
     id: '2',
@@ -21,18 +22,56 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Standard',
     ecoScore: 5,
     surged: false,
-    category: 'standard'
+    category: 'standard',
+    canShare: true
   },
   {
     id: '3',
     provider: ServiceProvider.TELEPORT,
-    price: 19.99,
+    price: 18.50,
     currency: 'USD',
-    eta: 12,
-    vehicleType: 'Eco Van',
+    eta: 10,
+    vehicleType: 'Teleport Eco Van',
     ecoScore: 9,
     surged: false,
-    category: 'eco'
+    category: 'eco',
+    canShare: true
+  },
+  {
+    id: '10',
+    provider: ServiceProvider.TELEPORT,
+    price: 35.00,
+    currency: 'USD',
+    eta: 15,
+    vehicleType: 'Teleport Water Taxi',
+    ecoScore: 8,
+    surged: false,
+    category: 'water',
+    canShare: true
+  },
+  {
+    id: '11',
+    provider: ServiceProvider.TELEPORT,
+    price: 12.00,
+    currency: 'USD',
+    eta: 20,
+    vehicleType: 'Cargo Bike',
+    ecoScore: 10,
+    surged: false,
+    category: 'bicycle',
+    canShare: false
+  },
+  {
+    id: '12',
+    provider: ServiceProvider.TELEPORT,
+    price: 45.00,
+    currency: 'USD',
+    eta: 25,
+    vehicleType: 'Heavy Logistics Van',
+    ecoScore: 6,
+    surged: false,
+    category: 'van',
+    canShare: false
   },
   {
     id: '4',
@@ -43,7 +82,8 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Uber Black',
     ecoScore: 3,
     surged: true,
-    category: 'luxury'
+    category: 'luxury',
+    canShare: false
   },
   {
     id: '5',
@@ -54,18 +94,20 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Lyft Lux',
     ecoScore: 4,
     surged: false,
-    category: 'luxury'
+    category: 'luxury',
+    canShare: false
   },
   {
     id: '6',
     provider: ServiceProvider.TELEPORT,
-    price: 15.00,
+    price: 14.00,
     currency: 'USD',
     eta: 15,
     vehicleType: 'Bike Courier',
     ecoScore: 10,
     surged: false,
-    category: 'delivery'
+    category: 'delivery',
+    canShare: false
   },
   {
     id: '7',
@@ -76,7 +118,8 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Uber Green',
     ecoScore: 8,
     surged: false,
-    category: 'eco'
+    category: 'eco',
+    canShare: true
   },
   {
     id: '8',
@@ -87,7 +130,8 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Electric Scooter',
     ecoScore: 10,
     surged: false,
-    category: 'scooter'
+    category: 'scooter',
+    canShare: false
   },
   {
     id: '9',
@@ -98,7 +142,8 @@ export const MOCK_QUOTES: Quote[] = [
     vehicleType: 'Bus 42',
     ecoScore: 9,
     surged: false,
-    category: 'transit'
+    category: 'transit',
+    canShare: false
   }
 ];
 

@@ -1,18 +1,30 @@
 import React, { useState } from 'react';
-import { Quote, X, CreditCard, CheckCircle, Smartphone } from 'lucide-react';
+import { Quote, X, CreditCard, CheckCircle, Smartphone, Landmark, Banknote } from 'lucide-react';
 
 interface PaymentModalProps {
   quote: Quote | null;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  currencySymbol?: string;
+  currencyMultiplier?: number;
 }
 
-export const PaymentModal: React.FC<PaymentModalProps> = ({ quote, isOpen, onClose, onSuccess }) => {
+export const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  quote, 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  currencySymbol = '$',
+  currencyMultiplier = 1
+}) => {
   const [processing, setProcessing] = useState(false);
   const [step, setStep] = useState<'method' | 'processing' | 'success'>('method');
+  const [paymentType, setPaymentType] = useState<'card' | 'bank' | 'cash'>('card');
 
   if (!isOpen || !quote) return null;
+
+  const displayPrice = (quote.price * currencyMultiplier).toFixed(2);
 
   const handlePay = () => {
     setStep('processing');
@@ -43,35 +55,72 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ quote, isOpen, onClo
             <div className="p-6 space-y-6">
               <div className="text-center">
                 <p className="text-gray-500 text-sm mb-1">Total Amount</p>
-                <p className="text-4xl font-bold text-slate-900">${quote.price.toFixed(2)}</p>
+                <p className="text-4xl font-bold text-slate-900">{currencySymbol}{displayPrice}</p>
                 <p className="text-xs text-gray-400 mt-2">{quote.provider} • {quote.vehicleType}</p>
               </div>
 
-              <div className="space-y-3">
+              {/* Payment Type Tabs */}
+              <div className="flex bg-gray-100 p-1 rounded-lg">
                 <button 
-                  onClick={handlePay}
-                  className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500 hover:bg-blue-50 transition-all group"
-                >
-                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-blue-200 group-hover:text-blue-700">
-                    <CreditCard size={20} />
-                  </div>
-                  <div className="text-left flex-1">
-                    <p className="font-semibold text-sm">Visa •••• 4242</p>
-                    <p className="text-xs text-gray-500">Expires 12/26</p>
-                  </div>
-                </button>
+                  onClick={() => setPaymentType('card')} 
+                  className={`flex-1 text-xs font-medium py-2 rounded-md transition-all ${paymentType === 'card' ? 'bg-white shadow-sm text-slate-900' : 'text-gray-500'}`}
+                >Card</button>
+                <button 
+                  onClick={() => setPaymentType('bank')} 
+                  className={`flex-1 text-xs font-medium py-2 rounded-md transition-all ${paymentType === 'bank' ? 'bg-white shadow-sm text-slate-900' : 'text-gray-500'}`}
+                >Bank</button>
+                <button 
+                  onClick={() => setPaymentType('cash')} 
+                  className={`flex-1 text-xs font-medium py-2 rounded-md transition-all ${paymentType === 'cash' ? 'bg-white shadow-sm text-slate-900' : 'text-gray-500'}`}
+                >Cash</button>
+              </div>
 
-                <button 
-                  onClick={handlePay}
-                  className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-black hover:bg-gray-50 transition-all group"
-                >
-                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-black group-hover:text-white transition-colors">
-                    <Smartphone size={20} />
-                  </div>
-                  <div className="text-left flex-1">
-                    <p className="font-semibold text-sm">Apple Pay</p>
-                  </div>
-                </button>
+              <div className="space-y-3">
+                {paymentType === 'card' && (
+                  <>
+                    <button onClick={handlePay} className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-blue-500 hover:bg-blue-50 transition-all group">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-blue-200 group-hover:text-blue-700">
+                        <CreditCard size={20} />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="font-semibold text-sm">Visa •••• 4242</p>
+                        <p className="text-xs text-gray-500">Expires 12/26</p>
+                      </div>
+                    </button>
+                    <button onClick={handlePay} className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-black hover:bg-gray-50 transition-all group">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-black group-hover:text-white transition-colors">
+                        <Smartphone size={20} />
+                      </div>
+                      <div className="text-left flex-1">
+                        <p className="font-semibold text-sm">Apple Pay</p>
+                      </div>
+                    </button>
+                  </>
+                )}
+
+                {paymentType === 'bank' && (
+                   <button onClick={handlePay} className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-green-500 hover:bg-green-50 transition-all group">
+                     <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-green-200 group-hover:text-green-700">
+                       <Landmark size={20} />
+                     </div>
+                     <div className="text-left flex-1">
+                       <p className="font-semibold text-sm">Direct Transfer</p>
+                       <p className="text-xs text-gray-500">Chase Bank •••• 8888</p>
+                     </div>
+                   </button>
+                )}
+
+                {paymentType === 'cash' && (
+                   <button onClick={handlePay} className="w-full border border-gray-200 rounded-xl p-4 flex items-center gap-4 hover:border-orange-500 hover:bg-orange-50 transition-all group">
+                     <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-600 group-hover:bg-orange-200 group-hover:text-orange-700">
+                       <Banknote size={20} />
+                     </div>
+                     <div className="text-left flex-1">
+                       <p className="font-semibold text-sm">Pay Driver in Cash</p>
+                       <p className="text-xs text-gray-500">Exact change recommended</p>
+                     </div>
+                   </button>
+                )}
               </div>
             </div>
           </>

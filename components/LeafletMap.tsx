@@ -39,19 +39,30 @@ const dropoffIcon = L.icon({
   shadowSize: [41, 41]
 });
 
-// Car icon for driver
+// Gold icon for stops
+const stopIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Car icon for driver with custom class for pulsing
 const driverIcon = L.icon({
-  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', // Simple car icon
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
-  popupAnchor: [0, -16],
-  className: 'driver-marker'
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', 
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+  popupAnchor: [0, -18],
+  className: 'driver-marker-pulse' 
 });
 
 interface LeafletMapProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', location: Location) => void;
   pickupLocation: Location | null;
   dropoffLocation: Location | null;
+  stops?: Location[]; // New prop for stops
   driverLocation?: Location | null;
 }
 
@@ -68,8 +79,9 @@ const MapEvents: React.FC<{
 const MapBoundsHandler: React.FC<{
   pickup: Location | null;
   dropoff: Location | null;
+  stops?: Location[];
   driver: Location | null | undefined;
-}> = ({ pickup, dropoff, driver }) => {
+}> = ({ pickup, dropoff, stops, driver }) => {
   const map = useMap();
 
   useEffect(() => {
@@ -90,11 +102,19 @@ const MapBoundsHandler: React.FC<{
       bounds.extend([driver.lat, driver.lng]);
       hasPoints = true;
     }
+    if (stops) {
+      stops.forEach(stop => {
+        if (stop.lat && stop.lng) {
+          bounds.extend([stop.lat, stop.lng]);
+          hasPoints = true;
+        }
+      });
+    }
 
     if (hasPoints) {
       map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [pickup, dropoff, driver, map]);
+  }, [pickup, dropoff, stops, driver, map]);
 
   return null;
 };
@@ -103,6 +123,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   onLocationSelect, 
   pickupLocation, 
   dropoffLocation,
+  stops = [],
   driverLocation
 }) => {
   // Center on San Francisco by default
@@ -118,49 +139,76 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     } else if (!dropoffLocation) {
       onLocationSelect('dropoff', newLocation);
     } else {
-      // Start over
+      // If both exist, restart by replacing pickup
       onLocationSelect('pickup', newLocation);
     }
   };
 
+  // Construct polyline path
+  const polylinePositions = [];
+  if (pickupLocation?.lat && pickupLocation.lng) polylinePositions.push([pickupLocation.lat, pickupLocation.lng] as [number, number]);
+  stops.forEach(s => {
+    if (s.lat && s.lng) polylinePositions.push([s.lat, s.lng] as [number, number]);
+  });
+  if (dropoffLocation?.lat && dropoffLocation.lng) polylinePositions.push([dropoffLocation.lat, dropoffLocation.lng] as [number, number]);
+
   return (
-    <MapContainer center={center} zoom={13} scrollWheelZoom={true} className="h-full w-full">
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      
-      <MapEvents onMapClick={handleMapClick} />
-      <MapBoundsHandler pickup={pickupLocation} dropoff={dropoffLocation} driver={driverLocation} />
-
-      {pickupLocation && pickupLocation.lat && pickupLocation.lng && (
-        <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon}>
-          <Popup>Pickup: {pickupLocation.address}</Popup>
-        </Marker>
-      )}
-
-      {dropoffLocation && dropoffLocation.lat && dropoffLocation.lng && (
-        <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon}>
-          <Popup>Dropoff: {dropoffLocation.address}</Popup>
-        </Marker>
-      )}
-
-      {driverLocation && driverLocation.lat && driverLocation.lng && (
-        <Marker position={[driverLocation.lat, driverLocation.lng]} icon={driverIcon}>
-           <Popup>Driver</Popup>
-        </Marker>
-      )}
-
-      {pickupLocation?.lat && dropoffLocation?.lat && (
-        <Polyline 
-          positions={[
-            [pickupLocation.lat!, pickupLocation.lng!],
-            [dropoffLocation.lat!, dropoffLocation.lng!]
-          ]}
-          color="blue"
-          dashArray="10, 10" 
+    <>
+      <style>
+        {`
+          .driver-marker-pulse {
+            animation: carPulse 1.5s infinite;
+          }
+          @keyframes carPulse {
+            0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(37, 99, 235, 0.4)); }
+            50% { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(37, 99, 235, 0.6)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(37, 99, 235, 0.4)); }
+          }
+        `}
+      </style>
+      <MapContainer center={center} zoom={13} scrollWheelZoom={true} className="h-full w-full">
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-      )}
-    </MapContainer>
+        
+        <MapEvents onMapClick={handleMapClick} />
+        <MapBoundsHandler pickup={pickupLocation} dropoff={dropoffLocation} stops={stops} driver={driverLocation} />
+
+        {pickupLocation && pickupLocation.lat && pickupLocation.lng && (
+          <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon}>
+            <Popup>Pickup: {pickupLocation.address}</Popup>
+          </Marker>
+        )}
+
+        {stops.map((stop, idx) => (
+          stop.lat && stop.lng && (
+            <Marker key={idx} position={[stop.lat, stop.lng]} icon={stopIcon}>
+              <Popup>Stop {idx + 1}: {stop.address}</Popup>
+            </Marker>
+          )
+        ))}
+
+        {dropoffLocation && dropoffLocation.lat && dropoffLocation.lng && (
+          <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon}>
+            <Popup>Dropoff: {dropoffLocation.address}</Popup>
+          </Marker>
+        )}
+
+        {driverLocation && driverLocation.lat && driverLocation.lng && (
+          <Marker position={[driverLocation.lat, driverLocation.lng]} icon={driverIcon}>
+             <Popup>Driver</Popup>
+          </Marker>
+        )}
+
+        {polylinePositions.length > 1 && (
+          <Polyline 
+            positions={polylinePositions}
+            color="blue"
+            dashArray="10, 10" 
+          />
+        )}
+      </MapContainer>
+    </>
   );
 };

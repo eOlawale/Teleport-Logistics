@@ -21,7 +21,8 @@ export interface Quote {
   vehicleType: string;
   ecoScore: number; // 1-10
   surged: boolean;
-  category: 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter';
+  category: 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'bicycle' | 'van';
+  canShare?: boolean;
 }
 
 export interface Location {
@@ -46,20 +47,23 @@ export interface ChatMessage {
 }
 
 export type SortOption = 'price' | 'eta' | 'eco';
-export type VehicleFilter = 'all' | 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter';
+export type VehicleFilter = 'all' | 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'van';
 
 export interface User {
   name: string;
   email: string;
-  role: 'rider' | 'business';
+  role: 'rider' | 'business' | 'driver';
   avatar?: string;
+  kycStatus: 'pending' | 'verified' | 'unverified';
+  currency: string;
 }
 
-export interface PaymentMethod {
+export interface WalletTransaction {
   id: string;
-  type: 'card' | 'apple_pay';
-  last4?: string;
-  label: string;
+  date: string;
+  amount: number;
+  type: 'earning' | 'withdrawal' | 'bonus';
+  status: 'completed' | 'pending';
 }
 
 export interface TripHistoryItem {
