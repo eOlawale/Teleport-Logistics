@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Menu, X, MapPin, Truck, Car, Briefcase, 
   User as UserIcon, ChevronRight, Search, 
@@ -46,11 +46,40 @@ const App: React.FC = () => {
   // Payment & Active Trip State
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [activeTrip, setActiveTrip] = useState<{ quote: Quote, status: string } | null>(null);
+  const [driverLocation, setDriverLocation] = useState<Location | null>(null);
 
   // Chat & Integration & History State
   const [isDriverChatOpen, setIsDriverChatOpen] = useState(false);
   const [isIntegrationsOpen, setIsIntegrationsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Simulate Driver Movement
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval>;
+    if (activeTrip && pickupCoords) {
+      // Start driver slightly away (approx 1km)
+      const startLat = pickupCoords.lat! - 0.008;
+      const startLng = pickupCoords.lng! - 0.008;
+      
+      let progress = 0;
+      interval = setInterval(() => {
+        progress += 0.02; // Move 2% closer every second
+        if (progress > 1) progress = 1; // Stop at pickup (or could loop)
+        
+        const curLat = startLat + (pickupCoords.lat! - startLat) * progress;
+        const curLng = startLng + (pickupCoords.lng! - startLng) * progress;
+        
+        setDriverLocation({ 
+          lat: curLat, 
+          lng: curLng, 
+          address: 'Driver Location' 
+        });
+      }, 1000);
+    } else {
+      setDriverLocation(null);
+    }
+    return () => clearInterval(interval);
+  }, [activeTrip, pickupCoords]);
 
   const handleLocationSelect = (type: 'pickup' | 'dropoff', location: Location) => {
     if (type === 'pickup') {
@@ -87,6 +116,15 @@ const App: React.FC = () => {
   };
 
   const handleBook = () => {
+    if (!user) {
+      setIsAuthOpen(true);
+    } else {
+      setIsPaymentOpen(true);
+    }
+  };
+
+  const handleQuickBook = (quote: Quote) => {
+    setSelectedQuote(quote);
     if (!user) {
       setIsAuthOpen(true);
     } else {
@@ -223,6 +261,9 @@ const App: React.FC = () => {
                    <h3 className="text-xl font-bold text-slate-900">{activeTrip.status}</h3>
                    <p className="text-slate-600 text-sm mt-1">{activeTrip.quote.vehicleType} • 4 min away</p>
                  </div>
+                 <div className="text-sm text-gray-500">
+                   Your driver is moving towards the pickup point.
+                 </div>
                  <div className="pt-4 border-t border-blue-100 flex justify-center gap-3">
                     <button 
                       onClick={() => setIsDriverChatOpen(!isDriverChatOpen)}
@@ -279,6 +320,7 @@ const App: React.FC = () => {
                       quote={quote} 
                       selected={selectedQuote?.id === quote.id}
                       onSelect={setSelectedQuote}
+                      onBook={() => handleQuickBook(quote)}
                     />
                   ))
                 ) : (
@@ -309,6 +351,7 @@ const App: React.FC = () => {
              onLocationSelect={handleLocationSelect}
              pickupLocation={pickupCoords}
              dropoffLocation={dropoffCoords}
+             driverLocation={driverLocation}
           />
           
           {showResults && !activeTrip && (

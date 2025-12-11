@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { Location } from '../types';
 
@@ -39,10 +39,20 @@ const dropoffIcon = L.icon({
   shadowSize: [41, 41]
 });
 
+// Car icon for driver
+const driverIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/3097/3097180.png', // Simple car icon
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -16],
+  className: 'driver-marker'
+});
+
 interface LeafletMapProps {
   onLocationSelect: (type: 'pickup' | 'dropoff', location: Location) => void;
   pickupLocation: Location | null;
   dropoffLocation: Location | null;
+  driverLocation?: Location | null;
 }
 
 const MapEvents: React.FC<{ 
@@ -54,10 +64,46 @@ const MapEvents: React.FC<{
   return null;
 };
 
+// Component to handle auto-fitting bounds
+const MapBoundsHandler: React.FC<{
+  pickup: Location | null;
+  dropoff: Location | null;
+  driver: Location | null | undefined;
+}> = ({ pickup, dropoff, driver }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+    
+    const bounds = L.latLngBounds([]);
+    let hasPoints = false;
+
+    if (pickup?.lat && pickup.lng) {
+      bounds.extend([pickup.lat, pickup.lng]);
+      hasPoints = true;
+    }
+    if (dropoff?.lat && dropoff.lng) {
+      bounds.extend([dropoff.lat, dropoff.lng]);
+      hasPoints = true;
+    }
+    if (driver?.lat && driver.lng) {
+      bounds.extend([driver.lat, driver.lng]);
+      hasPoints = true;
+    }
+
+    if (hasPoints) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [pickup, dropoff, driver, map]);
+
+  return null;
+};
+
 export const LeafletMap: React.FC<LeafletMapProps> = ({ 
   onLocationSelect, 
   pickupLocation, 
-  dropoffLocation 
+  dropoffLocation,
+  driverLocation
 }) => {
   // Center on San Francisco by default
   const [center] = useState<[number, number]>([37.7749, -122.4194]);
@@ -67,8 +113,6 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
     const address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     const newLocation = { address, lat, lng };
 
-    // Simple logic: If pickup is missing, set pickup. Otherwise set dropoff.
-    // If both exist, reset dropoff and set pickup to new location.
     if (!pickupLocation) {
       onLocationSelect('pickup', newLocation);
     } else if (!dropoffLocation) {
@@ -87,6 +131,7 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       />
       
       <MapEvents onMapClick={handleMapClick} />
+      <MapBoundsHandler pickup={pickupLocation} dropoff={dropoffLocation} driver={driverLocation} />
 
       {pickupLocation && pickupLocation.lat && pickupLocation.lng && (
         <Marker position={[pickupLocation.lat, pickupLocation.lng]} icon={pickupIcon}>
@@ -97,6 +142,12 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       {dropoffLocation && dropoffLocation.lat && dropoffLocation.lng && (
         <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon}>
           <Popup>Dropoff: {dropoffLocation.address}</Popup>
+        </Marker>
+      )}
+
+      {driverLocation && driverLocation.lat && driverLocation.lng && (
+        <Marker position={[driverLocation.lat, driverLocation.lng]} icon={driverIcon}>
+           <Popup>Driver</Popup>
         </Marker>
       )}
 

@@ -6,9 +6,10 @@ interface ComparisonCardProps {
   quote: Quote;
   onSelect: (quote: Quote) => void;
   selected: boolean;
+  onBook: () => void;
 }
 
-export const ComparisonCard: React.FC<ComparisonCardProps> = ({ quote, onSelect, selected }) => {
+export const ComparisonCard: React.FC<ComparisonCardProps> = ({ quote, onSelect, selected, onBook }) => {
   const getLogoColor = (provider: ServiceProvider) => {
     switch (provider) {
       case ServiceProvider.UBER: return 'text-black';
@@ -21,10 +22,11 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ quote, onSelect,
   };
 
   const getIcon = (type: string, category: string) => {
-    if (category === 'transit') return <Train size={16} />;
-    if (category === 'scooter') return <Bike size={16} />;
-    if (category === 'delivery') return <Package size={16} />;
-    return <Car size={16} />;
+    if (category === 'transit') return <Train size={18} className="text-gray-600" />;
+    if (category === 'scooter') return <Bike size={18} className="text-green-600" />;
+    if (category === 'delivery') return <Package size={18} className="text-blue-600" />;
+    if (category === 'eco') return <Zap size={18} className="text-teal-600" />;
+    return <Car size={18} className="text-gray-700" />;
   };
 
   return (
@@ -36,13 +38,20 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ quote, onSelect,
       `}
     >
       {quote.surged && (
-        <div className="absolute -top-3 right-4 bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+        <div className="absolute -top-2 right-4 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
           <Zap size={10} />
           High Demand
         </div>
       )}
       
-      <div className="flex justify-between items-center mb-2">
+      {quote.category === 'eco' && (
+         <div className="absolute -top-2 right-4 bg-teal-100 text-teal-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+           <Leaf size={10} />
+           Eco-Friendly
+         </div>
+      )}
+      
+      <div className="flex justify-between items-center mb-3 mt-1">
         <div className={`font-bold text-lg ${getLogoColor(quote.provider)}`}>
           {quote.provider}
         </div>
@@ -51,26 +60,36 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ quote, onSelect,
         </div>
       </div>
 
-      <div className="flex justify-between items-center text-sm text-gray-600">
-        <div className="flex items-center gap-2">
+      <div className="flex justify-between items-center text-sm text-gray-600 mb-4">
+        <div className="flex items-center gap-2 bg-gray-100 px-2 py-1 rounded-md">
           {getIcon(quote.vehicleType, quote.category)}
-          <span>{quote.vehicleType}</span>
+          <span className="font-medium text-slate-700">{quote.vehicleType}</span>
         </div>
-        <div className="font-medium text-slate-700">
+        <div className="font-medium text-slate-700 bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs">
           {quote.eta} min away
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-          <div 
-            className={`h-full rounded-full ${quote.ecoScore > 7 ? 'bg-green-500' : quote.ecoScore > 4 ? 'bg-yellow-500' : 'bg-red-400'}`}
-            style={{ width: `${quote.ecoScore * 10}%` }}
-          />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1 flex flex-col gap-1">
+             <div className="flex justify-between text-xs text-gray-400">
+               <span className="flex items-center gap-1"><Leaf size={10} /> Eco Score</span>
+               <span className="font-bold">{quote.ecoScore}/10</span>
+             </div>
+             <div className="h-2 bg-gray-100 rounded-full overflow-hidden w-full">
+                <div 
+                  className={`h-full rounded-full ${quote.ecoScore > 7 ? 'bg-green-500' : quote.ecoScore > 4 ? 'bg-yellow-500' : 'bg-red-400'}`}
+                  style={{ width: `${quote.ecoScore * 10}%` }}
+                />
+            </div>
         </div>
-        <div className="text-xs text-gray-400 flex items-center gap-1">
-          <Leaf size={10} /> Eco
-        </div>
+        
+        <button 
+           onClick={(e) => { e.stopPropagation(); onBook(); }}
+           className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition-colors shadow-sm active:scale-95 whitespace-nowrap"
+        >
+           Book Now
+        </button>
       </div>
     </div>
   );
