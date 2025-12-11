@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Clock, MapPin, ArrowRight, CheckCircle, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Clock, MapPin, ArrowRight, CheckCircle, XCircle, Star } from 'lucide-react';
 import { TripHistoryItem, ServiceProvider } from '../types';
 
 interface TripHistoryModalProps {
@@ -7,7 +7,7 @@ interface TripHistoryModalProps {
   onClose: () => void;
 }
 
-const MOCK_HISTORY: TripHistoryItem[] = [
+const INITIAL_HISTORY: TripHistoryItem[] = [
   { 
     id: '101', 
     date: 'Oct 24, 2023 • 2:30 PM', 
@@ -16,7 +16,8 @@ const MOCK_HISTORY: TripHistoryItem[] = [
     price: 24.50, 
     status: 'Completed', 
     from: '123 Main St, San Francisco', 
-    to: '456 Market St, San Francisco' 
+    to: '456 Market St, San Francisco',
+    rating: 0
   },
   { 
     id: '102', 
@@ -26,7 +27,8 @@ const MOCK_HISTORY: TripHistoryItem[] = [
     price: 15.00, 
     status: 'Completed', 
     from: 'Warehouse A', 
-    to: 'Client B HQ' 
+    to: 'Client B HQ',
+    rating: 5
   },
   { 
     id: '103', 
@@ -36,7 +38,8 @@ const MOCK_HISTORY: TripHistoryItem[] = [
     price: 4.20, 
     status: 'Completed', 
     from: 'Golden Gate Park', 
-    to: 'Sunset Blvd' 
+    to: 'Sunset Blvd',
+    rating: 4
   },
   { 
     id: '104', 
@@ -51,7 +54,13 @@ const MOCK_HISTORY: TripHistoryItem[] = [
 ];
 
 export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ isOpen, onClose }) => {
+  const [history, setHistory] = useState(INITIAL_HISTORY);
+
   if (!isOpen) return null;
+
+  const handleRate = (id: string, rating: number) => {
+    setHistory(prev => prev.map(item => item.id === id ? { ...item, rating } : item));
+  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
@@ -67,7 +76,7 @@ export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ isOpen, onCl
         </div>
 
         <div className="overflow-y-auto p-6 space-y-4">
-          {MOCK_HISTORY.map((trip) => (
+          {history.map((trip) => (
             <div key={trip.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow bg-white">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-3">
@@ -88,7 +97,7 @@ export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ isOpen, onCl
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+              <div className="flex items-center gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg mb-3">
                 <div className="flex items-center gap-2 truncate flex-1">
                   <MapPin size={14} className="text-gray-400" />
                   <span className="truncate">{trip.from}</span>
@@ -99,6 +108,24 @@ export const TripHistoryModal: React.FC<TripHistoryModalProps> = ({ isOpen, onCl
                   <span className="truncate">{trip.to}</span>
                 </div>
               </div>
+
+              {/* Rating Section */}
+              {trip.status === 'Completed' && (
+                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                  <span className="text-xs text-gray-500 font-medium">Rate Service:</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button 
+                        key={star}
+                        onClick={() => handleRate(trip.id, star)}
+                        className={`transition-colors hover:scale-110 ${trip.rating && trip.rating >= star ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-200'}`}
+                      >
+                        <Star size={18} fill="currentColor" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

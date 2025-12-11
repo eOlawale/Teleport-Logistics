@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, X, Mail, Lock, User as UserIcon, Briefcase, Car, Upload, Check, Landmark } from 'lucide-react';
+import { User, X, Mail, Lock, User as UserIcon, Briefcase, Car, Upload, Check, Landmark, Shield } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface AuthModalProps {
@@ -12,7 +12,7 @@ type AuthStep = 'login' | 'register_info' | 'register_kyc' | 'register_bank';
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }) => {
   const [step, setStep] = useState<AuthStep>('login');
-  const [role, setRole] = useState<'rider' | 'business' | 'driver'>('rider');
+  const [role, setRole] = useState<'rider' | 'business' | 'driver' | 'admin'>('rider');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [kycFile, setKycFile] = useState<string | null>(null);
@@ -111,6 +111,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin }
                  <button type="button" onClick={() => setRole('rider')} className={`flex-1 py-2 text-xs rounded border ${role === 'rider' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50'}`}>Rider</button>
                  <button type="button" onClick={() => setRole('driver')} className={`flex-1 py-2 text-xs rounded border ${role === 'driver' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50'}`}>Driver</button>
                  <button type="button" onClick={() => setRole('business')} className={`flex-1 py-2 text-xs rounded border ${role === 'business' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50'}`}>Business</button>
+                 <button type="button" onClick={() => setRole('admin')} className={`flex-1 py-2 text-xs rounded border ${role === 'admin' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50'}`}>Admin</button>
               </div>
 
               <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition-all">

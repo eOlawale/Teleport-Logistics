@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Teleport - Multimodal Transport & Logistics</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <style>
@@ -29,6 +41,11 @@
         width: 100%;
         height: 100%;
         z-index: 0;
+      }
+      
+      /* Dark Mode Map Filter */
+      .dark-map-tiles .leaflet-tile-pane {
+        filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
       }
 
       /* Custom Animations */
@@ -93,7 +110,7 @@
 }
 </script>
 </head>
-  <body class="bg-gray-50 text-slate-900">
+  <body class="bg-gray-50 text-slate-900 dark:bg-slate-950 dark:text-white transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

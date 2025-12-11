@@ -23,6 +23,8 @@ export interface Quote {
   surged: boolean;
   category: 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'bicycle' | 'van';
   canShare?: boolean;
+  badges?: string[]; // For competitive advantage (Fastest, Cheapest)
+  originalPrice?: number; // To show discounts
 }
 
 export interface Location {
@@ -52,10 +54,12 @@ export type VehicleFilter = 'all' | 'standard' | 'luxury' | 'delivery' | 'eco' |
 export interface User {
   name: string;
   email: string;
-  role: 'rider' | 'business' | 'driver';
+  role: 'rider' | 'business' | 'driver' | 'admin';
   avatar?: string;
   kycStatus: 'pending' | 'verified' | 'unverified';
   currency: string;
+  referralCode?: string;
+  credits?: number;
 }
 
 export interface WalletTransaction {
@@ -75,4 +79,23 @@ export interface TripHistoryItem {
   status: 'Completed' | 'Cancelled' | 'In Progress';
   from: string;
   to: string;
+  rating?: number; // 1-5
+}
+
+export interface SupportTicket {
+  id: string;
+  user: string;
+  type: 'complaint' | 'inquiry' | 'claim' | 'refund';
+  subject: string;
+  status: 'open' | 'resolved' | 'pending';
+  date: string;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  target: 'riders' | 'drivers' | 'all';
+  type: 'discount' | 'bonus' | 'communication';
+  status: 'active' | 'scheduled' | 'ended';
+  reach: number;
 }
