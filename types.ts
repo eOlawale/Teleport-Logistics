@@ -9,6 +9,9 @@ export enum ServiceProvider {
 export enum ServiceType {
   RIDE = 'RIDE',
   DELIVERY = 'DELIVERY',
+  EAT = 'EAT',
+  FREIGHT = 'FREIGHT',
+  RENT = 'RENT',
   BUSINESS_FREIGHT = 'BUSINESS_FREIGHT'
 }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, DollarSign, Activity, AlertTriangle, CheckCircle, Car, MapPin, Megaphone, Send, LayoutTemplate, HelpCircle, Mail, RotateCcw } from 'lucide-react';
+import { Users, DollarSign, Activity, AlertTriangle, CheckCircle, Car, MapPin, Megaphone, Send, LayoutTemplate, HelpCircle, Mail, RotateCcw, Bold, Italic, Underline, List, Link } from 'lucide-react';
 import { SupportTicket, Campaign } from '../types';
 
 const MOCK_TICKETS: SupportTicket[] = [
@@ -176,7 +176,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs font-bold text-gray-500">Target Audience</label>
-                    <select className="w-full border border-gray-200 rounded-lg p-2 mt-1 text-sm">
+                    <select className="w-full border border-gray-200 rounded-lg p-2 mt-1 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                       <option>All Users</option>
                       <option>Drivers Only</option>
                       <option>Riders Only</option>
@@ -185,9 +185,20 @@ export const AdminDashboard: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-500">Message Body</label>
-                    <textarea className="w-full border border-gray-200 rounded-lg p-2 mt-1 text-sm h-24" placeholder="Type your announcement here..."></textarea>
+                    <div className="border border-gray-200 rounded-lg mt-1 overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-shadow">
+                      <div className="bg-gray-50 border-b border-gray-200 p-2 flex gap-2">
+                        <button className="p-1 hover:bg-gray-200 rounded text-gray-600" title="Bold"><Bold size={14}/></button>
+                        <button className="p-1 hover:bg-gray-200 rounded text-gray-600" title="Italic"><Italic size={14}/></button>
+                        <button className="p-1 hover:bg-gray-200 rounded text-gray-600" title="Underline"><Underline size={14}/></button>
+                        <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                        <button className="p-1 hover:bg-gray-200 rounded text-gray-600" title="List"><List size={14}/></button>
+                        <button className="p-1 hover:bg-gray-200 rounded text-gray-600" title="Insert Link"><Link size={14}/></button>
+                      </div>
+                      <textarea className="w-full p-3 text-sm h-32 focus:outline-none resize-none" placeholder="Type your announcement here..."></textarea>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">Supports Markdown and HTML formatting.</p>
                   </div>
-                  <button className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-800">
+                  <button className="w-full bg-slate-900 text-white py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 hover:bg-slate-800 transition-colors">
                     <Send size={14} /> Send Broadcast
                   </button>
                 </div>

@@ -5,7 +5,7 @@ import {
   AlertCircle, Filter, Clock, Leaf, DollarSign,
   MessageSquare, Zap, LogOut, Settings, History,
   Bike, Train, Package, Globe, Plus, Trash2, Calendar, Users, Map as MapIcon, Shield, HelpCircle,
-  Locate
+  Locate, Utensils, Key
 } from 'lucide-react';
 import { MOCK_QUOTES } from './constants';
 import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider } from './types';
@@ -24,6 +24,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { SupportModal } from './components/SupportModal';
 import { ProfileModal } from './components/ProfileModal';
 import { LandingPage } from './components/LandingPage';
+import { EatLanding } from './components/EatLanding';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ServiceType>(ServiceType.RIDE);
@@ -151,6 +152,13 @@ const App: React.FC = () => {
       setDropoff(location.address);
     }
     setError(null);
+  };
+
+  const handleEatSearch = (address: string) => {
+    // For Eat mode, the entered address is the "Dropoff" (User location)
+    // We set it to simulate the user entering their location to find restaurants
+    setDropoff(address);
+    setDropoffCoords({ address, lat: 37.7749, lng: -122.4194 }); // Mock coords for SF
   };
 
   const handleGetCurrentLocation = () => {
@@ -299,18 +307,19 @@ const App: React.FC = () => {
       quotes = quotes.filter(q => q.canShare);
     }
 
-    // Dynamic Pricing Variables
+    // Dynamic Pricing Constants
     const PLATFORM_MARGIN = 1.05; // 5% Margin Increase
-    const RATES: Record<string, { base: number, perKm: number, perMin: number }> = {
-      standard: { base: 2.50, perKm: 1.25, perMin: 0.30 },
-      luxury: { base: 5.00, perKm: 2.75, perMin: 0.60 },
-      delivery: { base: 3.50, perKm: 1.10, perMin: 0.15 },
-      eco: { base: 2.80, perKm: 1.15, perMin: 0.25 },
-      transit: { base: 2.50, perKm: 0.10, perMin: 0 }, // Transit usually flat or low var
-      scooter: { base: 1.00, perKm: 0.40, perMin: 0.20 },
-      bicycle: { base: 1.00, perKm: 0.60, perMin: 0.15 },
-      water: { base: 12.00, perKm: 3.50, perMin: 0 },
-      van: { base: 10.00, perKm: 2.20, perMin: 0.45 },
+    // Base Rate, Cost per KM, Cost per Minute, Average Speed (km/h)
+    const RATES: Record<string, { base: number, perKm: number, perMin: number, speed: number }> = {
+      standard: { base: 2.00, perKm: 1.05, perMin: 0.20, speed: 30 },
+      luxury: { base: 5.00, perKm: 2.20, perMin: 0.50, speed: 35 },
+      delivery: { base: 3.50, perKm: 0.90, perMin: 0.15, speed: 25 },
+      eco: { base: 2.50, perKm: 1.00, perMin: 0.18, speed: 30 },
+      transit: { base: 2.50, perKm: 0.00, perMin: 0.00, speed: 25 }, // Flat rate usually
+      scooter: { base: 1.00, perKm: 0.35, perMin: 0.25, speed: 15 },
+      bicycle: { base: 1.00, perKm: 0.50, perMin: 0.15, speed: 12 },
+      water: { base: 12.00, perKm: 3.00, perMin: 0.00, speed: 40 },
+      van: { base: 10.00, perKm: 1.80, perMin: 0.40, speed: 25 },
     };
 
     // Calculate Distance (Simulated Haversine)
@@ -339,30 +348,28 @@ const App: React.FC = () => {
       // 1. Calculate Base Cost based on Category Rates and Distance
       const rate = RATES[q.category] || RATES.standard;
       
-      // Speed factors for ETA
-      let speedKmh = 30;
-      if (q.category === 'scooter' || q.category === 'bicycle') speedKmh = 15;
-      if (q.category === 'transit') speedKmh = 25;
-      if (q.category === 'luxury') speedKmh = 35;
+      const rawEta = (distanceKm / rate.speed) * 60; // minutes
+      const estimatedDurationMin = rawEta + 3; // +3 min buffer for pickup/dropoff
       
-      const rawEta = (distanceKm / speedKmh) * 60; // minutes
-      const estimatedDurationMin = rawEta + 3; // +3 min buffer
-
       // Base Price Formula: Base + (Dist * Rate) + (Time * Rate)
       let dynamicPrice = rate.base + (rate.perKm * distanceKm) + (rate.perMin * estimatedDurationMin);
 
       // 2. Provider Variance (Simulation)
       // Uber/Lyft/Teleport might have slightly different algos. 
       // Teleport is cheaper (Competitive Advantage)
-      if (q.provider === ServiceProvider.UBER) dynamicPrice *= 1.1; 
-      if (q.provider === ServiceProvider.LYFT) dynamicPrice *= 1.08; 
+      if (q.provider === ServiceProvider.UBER) dynamicPrice *= 1.12; 
+      if (q.provider === ServiceProvider.LYFT) dynamicPrice *= 1.09; 
       if (q.provider === ServiceProvider.TELEPORT) dynamicPrice *= 0.95; 
 
       // 3. Apply Traffic Surge
       let etaMultiplier = trafficSurge * (isSharedRide ? 1.2 : 1);
       if (activeTab === ServiceType.DELIVERY && isFlexibleDelivery) etaMultiplier *= 2; 
 
-      dynamicPrice = dynamicPrice * trafficSurge;
+      let finalSurge = trafficSurge;
+      if (q.surged) {
+         finalSurge = Math.max(trafficSurge, 1.4); // Force higher surge for surged items
+      }
+      dynamicPrice = dynamicPrice * finalSurge;
 
       // 4. Apply Platform Margin (5% increase)
       dynamicPrice = dynamicPrice * PLATFORM_MARGIN;
@@ -487,7 +494,17 @@ const App: React.FC = () => {
       );
     }
 
-    // Rider/Delivery View
+    // EAT LANDING VIEW
+    if (activeTab === ServiceType.EAT && !dropoffCoords) {
+      return (
+        <EatLanding 
+          onSearch={handleEatSearch}
+          onSignIn={() => setIsAuthOpen(true)}
+        />
+      );
+    }
+
+    // Rider/Delivery/Eat/Freight/Rent Main Map View
     return (
       <div className="flex flex-col lg:flex-row h-[calc(100vh-64px)] overflow-hidden animate-in fade-in duration-300 relative">
         
@@ -531,7 +548,12 @@ const App: React.FC = () => {
             {!activeTrip && (
               <>
                 <h2 className="text-2xl font-bold mb-6 text-slate-900 dark:text-white">
-                  {activeTab === ServiceType.RIDE ? 'Where to?' : 'What are we delivering?'}
+                  {activeTab === ServiceType.RIDE ? 'Where to?' : 
+                   activeTab === ServiceType.DELIVERY ? 'What are we delivering?' :
+                   activeTab === ServiceType.EAT ? 'Hungry? Find food nearby.' :
+                   activeTab === ServiceType.FREIGHT ? 'Heavy cargo destination?' :
+                   activeTab === ServiceType.RENT ? 'Where do you need a car?' :
+                   'Where to?'}
                 </h2>
                 
                 <form onSubmit={handleSearch} className="space-y-4">
@@ -542,7 +564,7 @@ const App: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        placeholder="Pickup location"
+                        placeholder={activeTab === ServiceType.EAT ? "Search Restaurants" : "Pickup location"}
                         value={pickup}
                         onChange={(e) => { setPickup(e.target.value); if(e.target.value === '') setPickupCoords(null); }}
                         className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-10 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && pickup.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
@@ -587,7 +609,7 @@ const App: React.FC = () => {
                       </div>
                       <input
                         type="text"
-                        placeholder="Dropoff location"
+                        placeholder={activeTab === ServiceType.EAT ? "Your Delivery Address" : "Dropoff location"}
                         value={dropoff}
                         onChange={(e) => { setDropoff(e.target.value); if(e.target.value === '') setDropoffCoords(null); }}
                         className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && dropoff.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
@@ -625,7 +647,12 @@ const App: React.FC = () => {
                     ) : (
                       <>
                         <Search size={18} />
-                        {activeTab === ServiceType.RIDE ? 'Find Teleports' : 'Find Couriers'}
+                        {activeTab === ServiceType.RIDE ? 'Find Teleports' : 
+                         activeTab === ServiceType.DELIVERY ? 'Find Couriers' :
+                         activeTab === ServiceType.EAT ? 'Find Restaurants' :
+                         activeTab === ServiceType.FREIGHT ? 'Find Trucks' :
+                         activeTab === ServiceType.RENT ? 'Find Vehicles' :
+                         'Search'}
                       </>
                     )}
                   </button>
@@ -788,21 +815,39 @@ const App: React.FC = () => {
               <>
                 <button 
                   onClick={() => setActiveTab(ServiceType.RIDE)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === ServiceType.RIDE ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.RIDE ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
                 >
-                  Ride
+                  <Car size={14} /> Ride
                 </button>
                 <button 
                   onClick={() => setActiveTab(ServiceType.DELIVERY)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === ServiceType.DELIVERY ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.DELIVERY ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
                 >
-                  Delivery
+                  <Package size={14} /> Delivery
+                </button>
+                <button 
+                  onClick={() => setActiveTab(ServiceType.EAT)}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.EAT ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                >
+                  <Utensils size={14} /> Eat
+                </button>
+                <button 
+                  onClick={() => setActiveTab(ServiceType.FREIGHT)}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.FREIGHT ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                >
+                  <Truck size={14} /> Freight
+                </button>
+                <button 
+                  onClick={() => setActiveTab(ServiceType.RENT)}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.RENT ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                >
+                  <Key size={14} /> Rent
                 </button>
                 <button 
                   onClick={() => setActiveTab(ServiceType.BUSINESS_FREIGHT)}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === ServiceType.BUSINESS_FREIGHT ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
+                  className={`px-3 lg:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-1.5 ${activeTab === ServiceType.BUSINESS_FREIGHT ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-white'}`}
                 >
-                  Business
+                  <Briefcase size={14} /> Business
                 </button>
               </>
             )}
@@ -895,7 +940,10 @@ const App: React.FC = () => {
         <div className="md:hidden bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 p-4 absolute top-16 left-0 right-0 z-40 shadow-lg animate-in slide-in-from-top-5 text-slate-900 dark:text-white">
            <div className="space-y-2">
             <button onClick={() => { setActiveTab(ServiceType.RIDE); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.RIDE ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Car size={18} /> Ride</span></button>
-            <button onClick={() => { setActiveTab(ServiceType.DELIVERY); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.DELIVERY ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Truck size={18} /> Delivery</span></button>
+            <button onClick={() => { setActiveTab(ServiceType.DELIVERY); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.DELIVERY ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Package size={18} /> Delivery</span></button>
+            <button onClick={() => { setActiveTab(ServiceType.EAT); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.EAT ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Utensils size={18} /> Eat</span></button>
+            <button onClick={() => { setActiveTab(ServiceType.FREIGHT); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.FREIGHT ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Truck size={18} /> Freight</span></button>
+            <button onClick={() => { setActiveTab(ServiceType.RENT); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.RENT ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Key size={18} /> Rent</span></button>
             <button onClick={() => { setActiveTab(ServiceType.BUSINESS_FREIGHT); setMenuOpen(false); }} className={`w-full text-left p-3 rounded-lg flex items-center justify-between ${activeTab === ServiceType.BUSINESS_FREIGHT ? 'bg-gray-50 dark:bg-slate-800 font-semibold' : ''}`}><span className="flex items-center gap-3"><Briefcase size={18} /> Business</span></button>
             <hr className="my-2 border-gray-200 dark:border-slate-800"/>
             {user?.role === 'driver' && (

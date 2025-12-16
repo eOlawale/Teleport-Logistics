@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Quote, ServiceProvider } from '../types';
 import { Car, Package, Leaf, Zap, Train, Bike, Ship, Truck, Star, CalendarClock, Info, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
 
@@ -21,6 +21,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
   currencySymbol = '$',
   currencyMultiplier = 1
 }) => {
+  const [showSurgeDetails, setShowSurgeDetails] = useState(false);
   const isTeleport = quote.provider === ServiceProvider.TELEPORT;
   const displayPrice = (quote.price * currencyMultiplier).toFixed(2);
   const originalPrice = quote.originalPrice ? (quote.originalPrice * currencyMultiplier).toFixed(2) : null;
@@ -73,12 +74,15 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
         )}
         {quote.surged && (
           <div className="relative group/tooltip">
-            <div className="bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm cursor-help">
+            <div 
+                onClick={(e) => { e.stopPropagation(); setShowSurgeDetails(!showSurgeDetails); }}
+                className="bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm cursor-help hover:bg-amber-200 dark:hover:bg-amber-800 transition-colors"
+            >
               <Zap size={10} />
               High Demand
             </div>
-            {/* Surge Tooltip */}
-            <div className="absolute top-6 right-0 w-48 bg-slate-900 dark:bg-slate-800 text-white text-xs p-2 rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50">
+            {/* Surge Tooltip (Desktop Hover) */}
+            <div className="hidden md:block absolute top-6 right-0 w-48 bg-slate-900 dark:bg-slate-800 text-white text-xs p-2 rounded-lg shadow-xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-200 z-50">
               <div className="flex items-start gap-2">
                 <Info size={14} className="shrink-0 mt-0.5" />
                 <span>Demand is higher than usual in your area. Fares have been adjusted.</span>
@@ -113,6 +117,13 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
           {quote.eta} min away
         </div>
       </div>
+
+      {showSurgeDetails && (
+        <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2 animate-in slide-in-from-top-2">
+           <Info size={14} className="shrink-0 mt-0.5" />
+           <span>Surge pricing is active due to increased demand in your area. Drivers are busier than usual.</span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1 flex flex-col gap-1">
