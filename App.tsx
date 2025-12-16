@@ -7,9 +7,10 @@ import {
   Bike, Train, Package, Globe, Plus, Trash2, Calendar, Users, Map as MapIcon, Shield, HelpCircle,
   Locate, Utensils, Key
 } from 'lucide-react';
-import { MOCK_QUOTES } from './constants';
-import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider } from './types';
+import { MOCK_QUOTES, MOCK_RESTAURANTS } from './constants';
+import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider, Restaurant } from './types';
 import { ComparisonCard } from './components/ComparisonCard';
+import { RestaurantCard } from './components/RestaurantCard';
 import { BusinessDashboard } from './components/BusinessDashboard';
 import { ChatAssistant } from './components/ChatAssistant';
 import { LeafletMap } from './components/LeafletMap';
@@ -99,6 +100,28 @@ const App: React.FC = () => {
     NGN: { symbol: '₦', rate: 1500 }
   };
 
+  // --- Location Caching & Permission Logic ---
+  useEffect(() => {
+    // 1. Check Cache on Mount
+    const cachedLocation = localStorage.getItem('teleport_user_location');
+    if (cachedLocation) {
+      try {
+        const loc = JSON.parse(cachedLocation);
+        setDropoffCoords(loc);
+        setDropoff(loc.address);
+      } catch (e) {
+        console.error("Failed to parse cached location");
+      }
+    }
+  }, []);
+
+  // Request location when switching to EAT if not set
+  useEffect(() => {
+    if (activeTab === ServiceType.EAT && !dropoffCoords && !showLanding) {
+       handleGetCurrentLocation('dropoff'); // Use dropoff as "My Location" for Eats
+    }
+  }, [activeTab, showLanding]);
+
   // Simulate Driver Movement
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -142,14 +165,21 @@ const App: React.FC = () => {
       setPickupCoords(location);
       setPickup(location.address);
       if (dropoffCoords && pickupCoords) {
-        setDropoff('');
-        setDropoffCoords(null);
-        setShowResults(false);
-        setActiveTrip(null);
+        // Only clear if switching context completely, otherwise keeping dropoff is useful
+        if (activeTab === ServiceType.RIDE) {
+           setDropoff('');
+           setDropoffCoords(null);
+           setShowResults(false);
+           setActiveTrip(null);
+        }
       }
     } else {
       setDropoffCoords(location);
       setDropoff(location.address);
+      // Cache user location (Dropoff is usually "Home" for Eats)
+      if (activeTab === ServiceType.EAT) {
+         localStorage.setItem('teleport_user_location', JSON.stringify(location));
+      }
     }
     setError(null);
   };
@@ -157,11 +187,14 @@ const App: React.FC = () => {
   const handleEatSearch = (address: string) => {
     // For Eat mode, the entered address is the "Dropoff" (User location)
     // We set it to simulate the user entering their location to find restaurants
+    const mockLoc = { address, lat: 37.7749, lng: -122.4194 };
     setDropoff(address);
-    setDropoffCoords({ address, lat: 37.7749, lng: -122.4194 }); // Mock coords for SF
+    setDropoffCoords(mockLoc); 
+    localStorage.setItem('teleport_user_location', JSON.stringify(mockLoc));
+    setShowResults(true); // Show restaurants immediately
   };
 
-  const handleGetCurrentLocation = () => {
+  const handleGetCurrentLocation = (target: 'pickup' | 'dropoff' = 'pickup') => {
     if (!navigator.geolocation) {
       setError("Geolocation is not supported by your browser.");
       return;
@@ -176,14 +209,27 @@ const App: React.FC = () => {
           lng: longitude,
           address: "Current Location"
         };
-        setPickupCoords(location);
-        setPickup("Current Location");
+        
+        if (target === 'pickup') {
+           setPickupCoords(location);
+           setPickup("Current Location");
+        } else {
+           setDropoffCoords(location);
+           setDropoff("Current Location");
+           localStorage.setItem('teleport_user_location', JSON.stringify(location));
+        }
+
         setIsLocating(false);
         setError(null);
       },
       (err) => {
         console.error(err);
-        setError("Unable to retrieve your location. Please check permissions.");
+        // Don't show error if it was an automatic background request
+        if (activeTab === ServiceType.EAT && !dropoffCoords) {
+           // silent fail or small toast
+        } else {
+           setError("Unable to retrieve your location. Please check permissions.");
+        }
         setIsLocating(false);
       }
     );
@@ -201,7 +247,6 @@ const App: React.FC = () => {
 
   const handleStopChange = (id: string, value: string) => {
     setStops(stops.map(s => s.id === id ? { ...s, value } : s));
-    // Simulate simple coord finding for stops if needed, or just clear coords on type
     if (value === '') {
        setStops(stops.map(s => s.id === id ? { ...s, value, coords: null } : s));
     }
@@ -210,19 +255,24 @@ const App: React.FC = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (pickup.length < 3) return setError('Please enter a valid pickup location.');
-    if (dropoff.length < 3) return setError('Please enter a valid dropoff location.');
+    if (activeTab !== ServiceType.EAT) {
+        if (pickup.length < 3) return setError('Please enter a valid pickup location.');
+        if (dropoff.length < 3) return setError('Please enter a valid dropoff location.');
+    } else {
+        // For EAT, we just need a dropoff (User location)
+        if (dropoff.length < 3) return setError('Please enter your delivery address.');
+    }
 
     setIsSearching(true);
     setShowResults(false);
     setActiveTrip(null);
-    setScheduledTime(null); // Reset schedule on new search
+    setScheduledTime(null); 
 
     setTimeout(() => {
       setIsSearching(false);
       setShowResults(true);
       setTrafficSurge(1 + Math.random() * 0.3);
-    }, 1500);
+    }, 1000);
   };
 
   const handleApplyPromo = () => {
@@ -255,6 +305,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleRestaurantClick = (restaurant: Restaurant) => {
+     // Simulate creating an order/assigning rider
+     alert(`Order started for ${restaurant.name}.\nRider assigned: Searching...\nDelivery to: ${dropoff}`);
+     
+     // Mock a quote for the payment modal
+     const mockQuote: Quote = {
+        id: restaurant.id,
+        provider: ServiceProvider.TELEPORT,
+        price: 25.00 + restaurant.baseDeliveryFee, // Mock food cost + fee
+        currency: 'USD',
+        eta: 30,
+        vehicleType: 'Food Delivery',
+        ecoScore: 10,
+        surged: false,
+        category: 'delivery'
+     };
+     setSelectedQuote(mockQuote);
+     setTimeout(() => {
+        alert("Rider Assigned: David (4.9★) on eBike.");
+        setIsPaymentOpen(true);
+     }, 1000);
+  };
+
   const handleScheduleClick = (quote: Quote) => {
     setSelectedQuote(quote);
     if (!user) {
@@ -273,14 +346,12 @@ const App: React.FC = () => {
     setIsPaymentOpen(false);
     if (selectedQuote) {
       if (scheduledTime) {
-         // It's a scheduled trip
          alert(`Trip Scheduled successfully for ${scheduledTime.date} at ${scheduledTime.time}!`);
          setScheduledTime(null);
          setActiveTrip(null); 
          setShowResults(false);
       } else {
-         // It's an immediate trip
-         setActiveTrip({ quote: selectedQuote, status: 'Driver en route' });
+         setActiveTrip({ quote: selectedQuote, status: activeTab === ServiceType.EAT ? 'Rider at Restaurant' : 'Driver en route' });
          setTimeout(() => setIsDriverChatOpen(true), 3000);
       }
     }
@@ -421,6 +492,25 @@ const App: React.FC = () => {
     return quotes;
   }, [sortBy, vehicleFilter, trafficSurge, stops.length, isSharedRide, activeDiscount, isFlexibleDelivery, activeTab, pickupCoords, dropoffCoords]);
 
+  // Eats Pricing Logic
+  const getDeliveryFee = (restaurant: Restaurant) => {
+     // Dynamic Delivery Fee based on distance (simulated) + margin
+     // Assume baseFee includes base distance, add surcharge for current location logic
+     let distFactor = 1;
+     if (dropoffCoords && restaurant.lat && restaurant.lng) {
+        const R = 6371; 
+        const dLat = (dropoffCoords.lat! - restaurant.lat) * Math.PI / 180;
+        const dLon = (dropoffCoords.lng! - restaurant.lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(restaurant.lat * Math.PI / 180) * Math.cos(dropoffCoords.lat! * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const d = R * c; 
+        distFactor = Math.max(1, d * 0.5); // Increase fee if far
+     }
+     
+     // 5% Platform Margin Logic + Rider Payout Adjustment
+     return (restaurant.baseDeliveryFee * distFactor * 1.05);
+  };
+
   const renderContent = () => {
     // Admin View
     if (showAdminDashboard && user?.role === 'admin') {
@@ -558,27 +648,31 @@ const App: React.FC = () => {
                 
                 <form onSubmit={handleSearch} className="space-y-4">
                   <div className="space-y-3">
-                    <div className="relative group">
-                      <div className="absolute top-3 left-3 text-gray-400 group-focus-within:text-slate-900 dark:group-focus-within:text-white transition-colors">
-                         <div className="w-2 h-2 rounded-full bg-current ring-2 ring-slate-200 dark:ring-slate-700"></div>
+                    
+                    {/* Only show Pickup if NOT in EAT mode. In EAT, Pickup is implicitly the Restaurant */}
+                    {activeTab !== ServiceType.EAT && (
+                      <div className="relative group">
+                        <div className="absolute top-3 left-3 text-gray-400 group-focus-within:text-slate-900 dark:group-focus-within:text-white transition-colors">
+                           <div className="w-2 h-2 rounded-full bg-current ring-2 ring-slate-200 dark:ring-slate-700"></div>
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Pickup location"
+                          value={pickup}
+                          onChange={(e) => { setPickup(e.target.value); if(e.target.value === '') setPickupCoords(null); }}
+                          className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-10 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && pickup.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => handleGetCurrentLocation('pickup')}
+                          className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+                          title="Use Current Location"
+                        >
+                          {isLocating ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div> : <Locate size={18} />}
+                        </button>
+                        <div className="absolute left-[15px] top-8 w-[2px] h-8 bg-gray-200 dark:bg-slate-700 -z-10 group-focus-within:bg-slate-300"></div>
                       </div>
-                      <input
-                        type="text"
-                        placeholder={activeTab === ServiceType.EAT ? "Search Restaurants" : "Pickup location"}
-                        value={pickup}
-                        onChange={(e) => { setPickup(e.target.value); if(e.target.value === '') setPickupCoords(null); }}
-                        className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-10 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && pickup.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
-                      />
-                      <button 
-                        type="button" 
-                        onClick={handleGetCurrentLocation}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
-                        title="Use Current Location"
-                      >
-                        {isLocating ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div> : <Locate size={18} />}
-                      </button>
-                      <div className="absolute left-[15px] top-8 w-[2px] h-8 bg-gray-200 dark:bg-slate-700 -z-10 group-focus-within:bg-slate-300"></div>
-                    </div>
+                    )}
 
                     {stops.map((stop, index) => (
                       <div key={stop.id} className="relative group animate-in slide-in-from-right-10">
@@ -612,12 +706,20 @@ const App: React.FC = () => {
                         placeholder={activeTab === ServiceType.EAT ? "Your Delivery Address" : "Dropoff location"}
                         value={dropoff}
                         onChange={(e) => { setDropoff(e.target.value); if(e.target.value === '') setDropoffCoords(null); }}
-                        className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-4 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && dropoff.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
+                        className={`w-full bg-gray-50 dark:bg-slate-800 dark:text-white border rounded-lg py-3 pl-10 pr-10 focus:ring-2 focus:ring-slate-900 dark:focus:ring-blue-500 focus:outline-none transition-all ${error && dropoff.length < 3 ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-slate-700'}`}
                       />
+                       <button 
+                          type="button" 
+                          onClick={() => handleGetCurrentLocation('dropoff')}
+                          className="absolute right-3 top-2.5 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+                          title="Use Current Location"
+                        >
+                          {isLocating ? <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div> : <Locate size={18} />}
+                        </button>
                     </div>
                   </div>
 
-                  {stops.length < 3 && !showResults && (
+                  {stops.length < 3 && !showResults && activeTab !== ServiceType.EAT && (
                     <button 
                       type="button"
                       onClick={handleAddStop}
@@ -642,14 +744,14 @@ const App: React.FC = () => {
                     {isSearching ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Routing...
+                        {activeTab === ServiceType.EAT ? 'Finding Food...' : 'Routing...'}
                       </>
                     ) : (
                       <>
                         <Search size={18} />
                         {activeTab === ServiceType.RIDE ? 'Find Teleports' : 
                          activeTab === ServiceType.DELIVERY ? 'Find Couriers' :
-                         activeTab === ServiceType.EAT ? 'Find Restaurants' :
+                         activeTab === ServiceType.EAT ? 'Search Restaurants' :
                          activeTab === ServiceType.FREIGHT ? 'Find Trucks' :
                          activeTab === ServiceType.RENT ? 'Find Vehicles' :
                          'Search'}
@@ -692,83 +794,103 @@ const App: React.FC = () => {
                </div>
             ) : showResults ? (
               <div className="space-y-4">
-                <div className="space-y-3 mb-4 pb-4 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 z-10 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                       <Filter size={14} /> Filter & Sort
-                    </h3>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{processedQuotes.length} options</span>
-                  </div>
-                  
-                  {/* Simplified Multimodal Filters */}
-                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                     <button onClick={() => setVehicleFilter('all')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'all' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>All Modes</button>
-                     <button onClick={() => setVehicleFilter('private')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'private' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Private Ride</button>
-                     <button onClick={() => setVehicleFilter('micro')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'micro' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Micro-Mobility</button>
-                     <button onClick={() => setVehicleFilter('transit')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'transit' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Public Transit</button>
-                  </div>
-                   
-                   {/* Promo Code Input */}
-                   <div className="flex gap-2">
-                      <input 
-                         type="text" 
-                         placeholder="Promo Code" 
-                         value={promoCode}
-                         onChange={(e) => setPromoCode(e.target.value)}
-                         className="flex-1 bg-gray-50 dark:bg-slate-800 dark:text-white border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                      />
-                      <button onClick={handleApplyPromo} className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-bold hover:bg-blue-200 dark:hover:bg-blue-900/50">Apply</button>
-                   </div>
-
-                   <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide mt-2">
-                     {/* Share Ride Toggle (Rides) */}
-                     {activeTab === ServiceType.RIDE && (
-                        <button 
-                          onClick={() => setIsSharedRide(!isSharedRide)}
-                          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1 whitespace-nowrap transition-colors ${isSharedRide ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
-                        >
-                          <Users size={12} /> Share & Save
-                        </button>
-                     )}
+                
+                {activeTab !== ServiceType.EAT && (
+                  <div className="space-y-3 mb-4 pb-4 border-b border-gray-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-slate-900 z-10 pt-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                         <Filter size={14} /> Filter & Sort
+                      </h3>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{processedQuotes.length} options</span>
+                    </div>
+                    
+                    {/* Simplified Multimodal Filters */}
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                       <button onClick={() => setVehicleFilter('all')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'all' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>All Modes</button>
+                       <button onClick={() => setVehicleFilter('private')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'private' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Private Ride</button>
+                       <button onClick={() => setVehicleFilter('micro')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'micro' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Micro-Mobility</button>
+                       <button onClick={() => setVehicleFilter('transit')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'transit' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Public Transit</button>
+                    </div>
                      
-                     {/* Flexible Delivery Toggle (Delivery) - Comparative Advantage */}
-                     {activeTab === ServiceType.DELIVERY && (
-                        <button 
-                          onClick={() => setIsFlexibleDelivery(!isFlexibleDelivery)}
-                          className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1 whitespace-nowrap transition-colors ${isFlexibleDelivery ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
-                        >
-                          <Clock size={12} /> Flexible (Save 15%)
-                        </button>
-                     )}
-                   </div>
-                </div>
+                     {/* Promo Code Input */}
+                     <div className="flex gap-2">
+                        <input 
+                           type="text" 
+                           placeholder="Promo Code" 
+                           value={promoCode}
+                           onChange={(e) => setPromoCode(e.target.value)}
+                           className="flex-1 bg-gray-50 dark:bg-slate-800 dark:text-white border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        />
+                        <button onClick={handleApplyPromo} className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-bold hover:bg-blue-200 dark:hover:bg-blue-900/50">Apply</button>
+                     </div>
 
-                {processedQuotes.length > 0 ? (
-                  processedQuotes.map((quote) => (
-                    <ComparisonCard 
-                      key={quote.id} 
-                      quote={quote} 
-                      selected={selectedQuote?.id === quote.id}
-                      onSelect={setSelectedQuote}
-                      onBook={() => handleQuickBook(quote)}
-                      onSchedule={() => handleScheduleClick(quote)}
-                      currencySymbol={currencyData[currency].symbol}
-                      currencyMultiplier={currencyData[currency].rate}
-                    />
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-gray-500 text-sm">No options match your filters.</div>
+                     <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide mt-2">
+                       {/* Share Ride Toggle (Rides) */}
+                       {activeTab === ServiceType.RIDE && (
+                          <button 
+                            onClick={() => setIsSharedRide(!isSharedRide)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1 whitespace-nowrap transition-colors ${isSharedRide ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                          >
+                            <Users size={12} /> Share & Save
+                          </button>
+                       )}
+                       
+                       {/* Flexible Delivery Toggle (Delivery) - Comparative Advantage */}
+                       {activeTab === ServiceType.DELIVERY && (
+                          <button 
+                            onClick={() => setIsFlexibleDelivery(!isFlexibleDelivery)}
+                            className={`px-3 py-1 rounded-md text-xs font-medium flex items-center gap-1 whitespace-nowrap transition-colors ${isFlexibleDelivery ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}
+                          >
+                            <Clock size={12} /> Flexible (Save 15%)
+                          </button>
+                       )}
+                     </div>
+                  </div>
                 )}
 
-                <div className="pt-2 pb-6">
-                   <button 
-                     disabled={!selectedQuote}
-                     onClick={handleBook}
-                     className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-blue-200/50"
-                   >
-                     {selectedQuote ? `Book ${selectedQuote.provider}` : 'Select an Option'}
-                   </button>
-                </div>
+                {activeTab === ServiceType.EAT ? (
+                   <div className="space-y-3">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Nearby Restaurants</h3>
+                      {MOCK_RESTAURANTS.map(restaurant => (
+                        <RestaurantCard 
+                           key={restaurant.id}
+                           restaurant={restaurant}
+                           onClick={handleRestaurantClick}
+                           currencySymbol={currencyData[currency].symbol}
+                           deliveryFee={getDeliveryFee(restaurant)}
+                        />
+                      ))}
+                   </div>
+                ) : (
+                  processedQuotes.length > 0 ? (
+                    processedQuotes.map((quote) => (
+                      <ComparisonCard 
+                        key={quote.id} 
+                        quote={quote} 
+                        selected={selectedQuote?.id === quote.id}
+                        onSelect={setSelectedQuote}
+                        onBook={() => handleQuickBook(quote)}
+                        onSchedule={() => handleScheduleClick(quote)}
+                        currencySymbol={currencyData[currency].symbol}
+                        currencyMultiplier={currencyData[currency].rate}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 text-sm">No options match your filters.</div>
+                  )
+                )}
+
+                {activeTab !== ServiceType.EAT && (
+                  <div className="pt-2 pb-6">
+                     <button 
+                       disabled={!selectedQuote}
+                       onClick={handleBook}
+                       className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-blue-200/50"
+                     >
+                       {selectedQuote ? `Book ${selectedQuote.provider}` : 'Select an Option'}
+                     </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-600 text-center opacity-60">

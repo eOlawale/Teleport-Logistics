@@ -30,6 +30,21 @@ export interface Quote {
   originalPrice?: number; // To show discounts
 }
 
+export interface Restaurant {
+  id: string;
+  name: string;
+  cuisine: string;
+  rating: number;
+  deliveryTimeRange: string; // e.g. "20-30"
+  baseDeliveryFee: number;
+  image: string;
+  address: string;
+  lat: number;
+  lng: number;
+  promo?: string;
+  priceLevel: '$' | '$$' | '$$$' | '$$$$';
+}
+
 export interface Location {
   address: string;
   lat?: number;
@@ -69,8 +84,9 @@ export interface WalletTransaction {
   id: string;
   date: string;
   amount: number;
-  type: 'earning' | 'withdrawal' | 'bonus';
+  type: 'earning' | 'withdrawal' | 'bonus' | 'tip';
   status: 'completed' | 'pending';
+  source?: 'ride' | 'eats' | 'freight';
 }
 
 export interface TripHistoryItem {
