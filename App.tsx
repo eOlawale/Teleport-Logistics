@@ -5,10 +5,10 @@ import {
   AlertCircle, Filter, Clock, Leaf, DollarSign,
   MessageSquare, Zap, LogOut, Settings, History,
   Bike, Train, Package, Globe, Plus, Trash2, Calendar, Users, Map as MapIcon, Shield, HelpCircle,
-  Locate, Utensils, Key
+  Locate, Utensils, Key, Bell, Ticket, CheckCircle
 } from 'lucide-react';
-import { MOCK_QUOTES, MOCK_RESTAURANTS } from './constants';
-import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider, Restaurant } from './types';
+import { MOCK_QUOTES, MOCK_RESTAURANTS, MOCK_RIDERS } from './constants';
+import { Quote, ServiceType, Location, SortOption, VehicleFilter, User, ServiceProvider, Restaurant, Notification } from './types';
 import { ComparisonCard } from './components/ComparisonCard';
 import { RestaurantCard } from './components/RestaurantCard';
 import { BusinessDashboard } from './components/BusinessDashboard';
@@ -36,6 +36,10 @@ const App: React.FC = () => {
 
   // Landing Page State
   const [showLanding, setShowLanding] = useState(true);
+
+  // Notifications State
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Apply Dark Mode Class to HTML/Body
   useEffect(() => {
@@ -67,7 +71,7 @@ const App: React.FC = () => {
 
   // Filtering, Sorting & Discounts
   const [sortBy, setSortBy] = useState<SortOption>('price');
-  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter | 'private' | 'micro' | 'transit'>('all');
+  const [vehicleFilter, setVehicleFilter] = useState<VehicleFilter | 'private' | 'micro' | 'transit' | 'tricycle'>('all');
   const [isSharedRide, setIsSharedRide] = useState(false);
   const [currency, setCurrency] = useState<'USD' | 'EUR' | 'GBP' | 'NGN'>('USD');
   const [promoCode, setPromoCode] = useState('');
@@ -85,6 +89,7 @@ const App: React.FC = () => {
   const [scheduledTime, setScheduledTime] = useState<{date: string, time: string} | null>(null);
   const [activeTrip, setActiveTrip] = useState<{ quote: Quote, status: string } | null>(null);
   const [driverLocation, setDriverLocation] = useState<Location | null>(null);
+  const [tripPhase, setTripPhase] = useState<'pickup' | 'dropoff'>('pickup'); // To track delivery legs
 
   // Chat & Integration & History & Support State
   const [isDriverChatOpen, setIsDriverChatOpen] = useState(false);
@@ -122,37 +127,103 @@ const App: React.FC = () => {
     }
   }, [activeTab, showLanding]);
 
-  // Simulate Driver Movement
+  // --- Real-time Driver Simulation with Phases ---
+  // Improved logic: 
+  // RIDE: Driver moves to Pickup (Phase: pickup)
+  // EATS: Driver (simulated) -> Restaurant (Phase: pickup) -> Customer (Phase: dropoff)
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (activeTrip && pickupCoords) {
-      // Start driver slightly away (approx 1km)
-      const startLat = pickupCoords.lat! - 0.008;
-      const startLng = pickupCoords.lng! - 0.008;
+      
+      let startLat = 0;
+      let startLng = 0;
+      let targetLat = 0;
+      let targetLng = 0;
+
+      // Determine Start/End points based on Trip Phase
+      if (tripPhase === 'pickup') {
+         // Driver coming to Pickup/Restaurant
+         startLat = pickupCoords.lat! - 0.008; // Simulate driver starting nearby
+         startLng = pickupCoords.lng! - 0.008;
+         targetLat = pickupCoords.lat!;
+         targetLng = pickupCoords.lng!;
+      } else if (tripPhase === 'dropoff' && dropoffCoords) {
+         // Driver going from Pickup/Restaurant to Dropoff/Customer
+         startLat = pickupCoords.lat!;
+         startLng = pickupCoords.lng!;
+         targetLat = dropoffCoords.lat!;
+         targetLng = dropoffCoords.lng!;
+      } else {
+         // Fallback if missing dropoff coords in RIDE mode
+         startLat = pickupCoords.lat! - 0.008;
+         startLng = pickupCoords.lng! - 0.008;
+         targetLat = pickupCoords.lat!;
+         targetLng = pickupCoords.lng!;
+      }
       
       let progress = 0;
+      // Increased Refresh Rate: 200ms instead of 1000ms for smoother animation
       interval = setInterval(() => {
-        progress += 0.02; // Move 2% closer every second
-        if (progress > 1) progress = 1; // Stop at pickup (or could loop)
+        progress += 0.002; // Slower movement for realism across map
+        if (progress > 1) progress = 1; 
         
-        const curLat = startLat + (pickupCoords.lat! - startLat) * progress;
-        const curLng = startLng + (pickupCoords.lng! - startLng) * progress;
+        const curLat = startLat + (targetLat - startLat) * progress;
+        const curLng = startLng + (targetLng - startLng) * progress;
         
         setDriverLocation({ 
           lat: curLat, 
           lng: curLng, 
           address: 'Driver Location' 
         });
-      }, 1000);
+      }, 200); 
     } else {
       setDriverLocation(null);
     }
     return () => clearInterval(interval);
-  }, [activeTrip, pickupCoords]);
+  }, [activeTrip, pickupCoords, dropoffCoords, tripPhase]);
+
+  const addNotification = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+    const newNote: Notification = {
+      id: Date.now().toString(),
+      title,
+      message,
+      type,
+      read: false,
+      time: 'Just now'
+    };
+    setNotifications(prev => [newNote, ...prev]);
+  };
+
+  // --- Smart Rider Assignment Logic ---
+  const findBestRider = (restaurant: Restaurant): any => {
+     // Scoring algorithm:
+     // Score = (Rating * 10) - (Distance * 2) - (CurrentLoad * 5)
+     // Higher is better.
+     
+     let bestRider = null;
+     let highestScore = -Infinity;
+
+     MOCK_RIDERS.forEach(rider => {
+        const dist = Math.sqrt(Math.pow(rider.lat - restaurant.lat, 2) + Math.pow(rider.lng - restaurant.lng, 2)) * 100; // Approx distance
+        const score = (rider.rating * 10) - (dist * 2) - (rider.load * 5);
+        
+        if (score > highestScore) {
+           highestScore = score;
+           bestRider = rider;
+        }
+     });
+
+     return bestRider || MOCK_RIDERS[0]; // Fallback
+  };
 
   const handleUserLogin = (u: User) => {
-    setUser(u);
+    // Simulate Premium User check for Bargain Price logic
+    const enhancedUser = { ...u, isPremium: u.role === 'business' || Math.random() > 0.5 };
+    setUser(enhancedUser);
     setShowLanding(false); // Move to app
+    if (enhancedUser.isPremium) {
+      addNotification("Premium Member", "You have access to exclusive bargain prices today!", 'success');
+    }
   };
 
   const handleLogout = () => {
@@ -306,26 +377,33 @@ const App: React.FC = () => {
   };
 
   const handleRestaurantClick = (restaurant: Restaurant) => {
-     // Simulate creating an order/assigning rider
-     alert(`Order started for ${restaurant.name}.\nRider assigned: Searching...\nDelivery to: ${dropoff}`);
+     // 1. Assign best rider logic
+     const assignedRider = findBestRider(restaurant);
      
-     // Mock a quote for the payment modal
+     // 2. Set Pickup to Restaurant Location (Important for map tracking)
+     const restaurantLocation = { 
+       lat: restaurant.lat, 
+       lng: restaurant.lng, 
+       address: restaurant.name 
+     };
+     setPickupCoords(restaurantLocation);
+     setPickup(restaurant.name);
+
+     // 3. Create Quote with Rider info
      const mockQuote: Quote = {
         id: restaurant.id,
         provider: ServiceProvider.TELEPORT,
-        price: 25.00 + restaurant.baseDeliveryFee, // Mock food cost + fee
+        price: 25.00 + restaurant.baseDeliveryFee, 
         currency: 'USD',
         eta: 30,
-        vehicleType: 'Food Delivery',
+        vehicleType: `${assignedRider.vehicle} • ${assignedRider.name}`,
         ecoScore: 10,
         surged: false,
         category: 'delivery'
      };
+     
      setSelectedQuote(mockQuote);
-     setTimeout(() => {
-        alert("Rider Assigned: David (4.9★) on eBike.");
-        setIsPaymentOpen(true);
-     }, 1000);
+     setIsPaymentOpen(true);
   };
 
   const handleScheduleClick = (quote: Quote) => {
@@ -351,8 +429,45 @@ const App: React.FC = () => {
          setActiveTrip(null); 
          setShowResults(false);
       } else {
-         setActiveTrip({ quote: selectedQuote, status: activeTab === ServiceType.EAT ? 'Rider at Restaurant' : 'Driver en route' });
-         setTimeout(() => setIsDriverChatOpen(true), 3000);
+         // Start Order Lifecycle Simulation
+         
+         // 1. Order Confirmed (Immediate)
+         setActiveTrip({ quote: selectedQuote, status: activeTab === ServiceType.EAT ? 'Order Confirmed' : 'Driver en route' });
+         addNotification("Order Confirmed", `Your order with ${selectedQuote.id.startsWith('r') ? 'Restaurant' : 'provider'} is confirmed.`, 'success');
+         setTripPhase('pickup');
+
+         if (activeTab === ServiceType.EAT) {
+            // EATS Specific Lifecycle
+            
+            // 2. Preparing (2s)
+            setTimeout(() => {
+               setActiveTrip(prev => prev ? { ...prev, status: 'Preparing Food' } : null);
+            }, 2000);
+
+            // 3. Rider Assigned (5s)
+            setTimeout(() => {
+               setActiveTrip(prev => prev ? { ...prev, status: `Rider Assigned: ${selectedQuote.vehicleType.split('•')[1] || 'David'}` } : null);
+               addNotification("Rider Assigned", `${selectedQuote.vehicleType.split('•')[1] || 'David'} is heading to the restaurant.`, 'info');
+            }, 5000);
+
+            // 4. Out for Delivery (10s) - SWITCH MAP PHASE
+            setTimeout(() => {
+               setActiveTrip(prev => prev ? { ...prev, status: 'Out for Delivery' } : null);
+               setTripPhase('dropoff'); // Triggers map to draw line from Restaurant to User
+               addNotification("Out for Delivery", `Your order is on the way! ETA: ${selectedQuote.eta} mins.`, 'success');
+            }, 10000);
+
+            // 5. Delivered (25s)
+            setTimeout(() => {
+               setActiveTrip(prev => prev ? { ...prev, status: 'Delivered' } : null);
+               addNotification("Delivered", "Enjoy your meal!", 'success');
+               setTimeout(() => setIsDriverChatOpen(false), 5000); // Close chat if open
+            }, 25000);
+
+         } else {
+            // Standard Ride Lifecycle
+            setTimeout(() => setIsDriverChatOpen(true), 3000);
+         }
       }
     }
   };
@@ -369,6 +484,8 @@ const App: React.FC = () => {
          quotes = quotes.filter(q => ['scooter', 'bicycle'].includes(q.category));
       } else if (vehicleFilter === 'transit') {
          quotes = quotes.filter(q => ['transit', 'water'].includes(q.category));
+      } else if (vehicleFilter === 'tricycle') {
+         quotes = quotes.filter(q => ['tricycle'].includes(q.category));
       } else {
          quotes = quotes.filter(q => q.category === vehicleFilter);
       }
@@ -391,6 +508,7 @@ const App: React.FC = () => {
       bicycle: { base: 1.00, perKm: 0.50, perMin: 0.15, speed: 12 },
       water: { base: 12.00, perKm: 3.00, perMin: 0.00, speed: 40 },
       van: { base: 10.00, perKm: 1.80, perMin: 0.40, speed: 25 },
+      tricycle: { base: 1.50, perKm: 0.60, perMin: 0.15, speed: 15 }, // Tricycle Community Rate
     };
 
     // Calculate Distance (Simulated Haversine)
@@ -449,12 +567,19 @@ const App: React.FC = () => {
       const originalPrice = dynamicPrice * stopMultiplier;
       const finalPrice = originalPrice * totalDiscountMultiplier;
 
+      // 6. Bargain Price Calculation (Premium Customers)
+      let bargainPrice = undefined;
+      if (user?.isPremium && (q.provider === ServiceProvider.TELEPORT || q.category === 'luxury')) {
+         bargainPrice = finalPrice * 0.90; // 10% off for premium
+      }
+
       return {
         ...q,
         eta: Math.round(rawEta * etaMultiplier), 
         price: finalPrice,
         originalPrice: finalPrice < originalPrice ? originalPrice : undefined,
-        vehicleType: isSharedRide ? `${q.vehicleType} (Shared)` : q.vehicleType
+        vehicleType: isSharedRide ? `${q.vehicleType} (Shared)` : q.vehicleType,
+        bargainPrice
       };
     });
 
@@ -472,9 +597,9 @@ const App: React.FC = () => {
       }));
     }
 
-    // Sort
+    // Sort - OPTIMIZED FOR TELEPORT
     quotes.sort((a, b) => {
-      // 1. Prioritize Teleport Fleet
+      // 1. Prioritize Teleport Fleet (Optimization)
       const aIsTeleport = a.provider === ServiceProvider.TELEPORT;
       const bIsTeleport = b.provider === ServiceProvider.TELEPORT;
       
@@ -490,7 +615,7 @@ const App: React.FC = () => {
       }
     });
     return quotes;
-  }, [sortBy, vehicleFilter, trafficSurge, stops.length, isSharedRide, activeDiscount, isFlexibleDelivery, activeTab, pickupCoords, dropoffCoords]);
+  }, [sortBy, vehicleFilter, trafficSurge, stops.length, isSharedRide, activeDiscount, isFlexibleDelivery, activeTab, pickupCoords, dropoffCoords, user]);
 
   // Eats Pricing Logic
   const getDeliveryFee = (restaurant: Restaurant) => {
@@ -773,7 +898,9 @@ const App: React.FC = () => {
                     <div className="text-left">
                         <h3 className="text-xl font-bold text-slate-900 dark:text-white">{activeTrip.status}</h3>
                         <p className="text-slate-600 dark:text-slate-300 text-sm">{activeTrip.quote.vehicleType}</p>
-                        <p className="text-blue-600 dark:text-blue-400 text-xs font-bold mt-1">4 min away</p>
+                        <p className="text-blue-600 dark:text-blue-400 text-xs font-bold mt-1">
+                           {activeTab === ServiceType.EAT ? 'Tracking Order...' : '4 min away'}
+                        </p>
                     </div>
                  </div>
                  
@@ -791,6 +918,30 @@ const App: React.FC = () => {
                       Cancel
                     </button>
                  </div>
+                 {/* Order Status Steps for EATS */}
+                 {activeTab === ServiceType.EAT && (
+                    <div className="flex justify-between items-center px-2 pt-2 text-[10px] text-gray-500">
+                       <div className={`flex flex-col items-center gap-1 ${['Order Confirmed', 'Preparing Food', 'Rider Assigned', 'Out for Delivery', 'Delivered'].includes(activeTrip.status) ? 'text-green-600 font-bold' : ''}`}>
+                          <div className="w-2 h-2 rounded-full bg-current"></div>
+                          Confirmed
+                       </div>
+                       <div className="h-[1px] flex-1 bg-gray-300 mx-1"></div>
+                       <div className={`flex flex-col items-center gap-1 ${['Rider Assigned', 'Out for Delivery', 'Delivered'].includes(activeTrip.status) ? 'text-green-600 font-bold' : ''}`}>
+                          <div className="w-2 h-2 rounded-full bg-current"></div>
+                          Assigned
+                       </div>
+                       <div className="h-[1px] flex-1 bg-gray-300 mx-1"></div>
+                       <div className={`flex flex-col items-center gap-1 ${['Out for Delivery', 'Delivered'].includes(activeTrip.status) ? 'text-green-600 font-bold' : ''}`}>
+                          <div className="w-2 h-2 rounded-full bg-current"></div>
+                          On Way
+                       </div>
+                       <div className="h-[1px] flex-1 bg-gray-300 mx-1"></div>
+                        <div className={`flex flex-col items-center gap-1 ${['Delivered'].includes(activeTrip.status) ? 'text-green-600 font-bold' : ''}`}>
+                          <div className="w-2 h-2 rounded-full bg-current"></div>
+                          Delivered
+                       </div>
+                    </div>
+                 )}
                </div>
             ) : showResults ? (
               <div className="space-y-4">
@@ -808,6 +959,7 @@ const App: React.FC = () => {
                     <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                        <button onClick={() => setVehicleFilter('all')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'all' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>All Modes</button>
                        <button onClick={() => setVehicleFilter('private')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'private' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Private Ride</button>
+                       <button onClick={() => setVehicleFilter('tricycle')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'tricycle' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Tricycle (New)</button>
                        <button onClick={() => setVehicleFilter('micro')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'micro' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Micro-Mobility</button>
                        <button onClick={() => setVehicleFilter('transit')} className={`px-3 py-1.5 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${vehicleFilter === 'transit' ? 'bg-slate-900 text-white dark:bg-blue-600' : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-600 dark:text-gray-300'}`}>Public Transit</button>
                     </div>
@@ -1001,6 +1153,47 @@ const App: React.FC = () => {
               <button onClick={() => setCurrency('USD')} className={`px-2 py-1 text-xs rounded font-bold ${currency === 'USD' ? 'bg-white dark:bg-slate-700 shadow dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}>USD</button>
               <button onClick={() => setCurrency('EUR')} className={`px-2 py-1 text-xs rounded font-bold ${currency === 'EUR' ? 'bg-white dark:bg-slate-700 shadow dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}>EUR</button>
               <button onClick={() => setCurrency('NGN')} className={`px-2 py-1 text-xs rounded font-bold ${currency === 'NGN' ? 'bg-white dark:bg-slate-700 shadow dark:text-white' : 'text-gray-500 dark:text-slate-400'}`}>NGN</button>
+           </div>
+
+           {/* Notifications Button */}
+           <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="text-gray-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                title="Notifications"
+              >
+                <Bell size={20} />
+                {notifications.some(n => !n.read) && (
+                   <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden z-[100] animate-in slide-in-from-top-2">
+                   <div className="p-3 border-b border-gray-100 dark:border-slate-800 font-bold text-sm flex justify-between">
+                      <span>Notifications</span>
+                      <button onClick={() => setNotifications([])} className="text-xs text-blue-600">Clear All</button>
+                   </div>
+                   <div className="max-h-64 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-gray-400 text-xs">No new notifications</div>
+                      ) : (
+                        notifications.map(note => (
+                           <div key={note.id} className="p-3 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors border-b border-gray-100 dark:border-slate-800 last:border-0">
+                              <div className="flex items-start gap-2">
+                                 <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${note.type === 'success' ? 'bg-green-500' : note.type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`}></div>
+                                 <div>
+                                    <h4 className="text-sm font-semibold">{note.title}</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{note.message}</p>
+                                    <p className="text-[10px] text-gray-400 mt-1">{note.time}</p>
+                                 </div>
+                              </div>
+                           </div>
+                        ))
+                      )}
+                   </div>
+                </div>
+              )}
            </div>
 
            {/* Support Button */}

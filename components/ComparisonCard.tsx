@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Quote, ServiceProvider } from '../types';
-import { Car, Package, Leaf, Zap, Train, Bike, Ship, Truck, Star, CalendarClock, Info, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
+import { Car, Package, Leaf, Zap, Train, Bike, Ship, Truck, Star, CalendarClock, Info, TrendingDown, Clock, ShieldCheck, Ticket } from 'lucide-react';
 
 interface ComparisonCardProps {
   quote: Quote;
@@ -25,6 +25,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
   const isTeleport = quote.provider === ServiceProvider.TELEPORT;
   const displayPrice = (quote.price * currencyMultiplier).toFixed(2);
   const originalPrice = quote.originalPrice ? (quote.originalPrice * currencyMultiplier).toFixed(2) : null;
+  const bargainPrice = quote.bargainPrice ? (quote.bargainPrice * currencyMultiplier).toFixed(2) : null;
 
   const getLogoColor = (provider: ServiceProvider) => {
     switch (provider) {
@@ -33,6 +34,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
       case ServiceProvider.TELEPORT: return 'text-blue-600 dark:text-blue-400';
       case ServiceProvider.LIME: return 'text-green-600 dark:text-green-400';
       case ServiceProvider.METRO: return 'text-orange-600 dark:text-orange-400';
+      case ServiceProvider.COMMUNITY: return 'text-purple-600 dark:text-purple-400';
       default: return 'text-gray-700 dark:text-gray-300';
     }
   };
@@ -45,6 +47,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
     if (category === 'water') return <Ship size={18} className="text-blue-500 dark:text-blue-400" />;
     if (category === 'van') return <Truck size={18} className="text-slate-700 dark:text-slate-300" />;
     if (category === 'eco') return <Leaf size={18} className="text-teal-600 dark:text-teal-400" />;
+    if (category === 'tricycle') return <Bike size={18} className="text-purple-600 dark:text-purple-400" />;
     return <Car size={18} className="text-gray-700 dark:text-gray-300" />;
   };
 
@@ -67,9 +70,9 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
            </div>
         ))}
         {isTeleport && (
-           <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+           <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm animate-pulse">
              <Star size={10} fill="currentColor" />
-             Preferred
+             Recommended
            </div>
         )}
         {quote.surged && (
@@ -97,14 +100,24 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
           {quote.provider}
         </div>
         <div className="text-right">
-            {originalPrice && (
+            {originalPrice && !bargainPrice && (
                 <div className="text-xs text-gray-400 line-through mr-1">
                     {currencySymbol}{originalPrice}
                 </div>
             )}
-            <div className={`text-xl font-bold ${originalPrice ? 'text-green-600 dark:text-green-400' : 'text-slate-900 dark:text-white'}`}>
-              {currencySymbol}{displayPrice}
-            </div>
+            
+            {bargainPrice ? (
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-gray-400 line-through">{currencySymbol}{displayPrice}</span>
+                <span className="text-xl font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                  <Ticket size={14} /> {currencySymbol}{bargainPrice}
+                </span>
+              </div>
+            ) : (
+              <div className={`text-xl font-bold ${originalPrice ? 'text-green-600 dark:text-green-400' : 'text-slate-900 dark:text-white'}`}>
+                {currencySymbol}{displayPrice}
+              </div>
+            )}
         </div>
       </div>
 
@@ -122,6 +135,12 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
         <div className="mb-4 p-2.5 bg-amber-50 dark:bg-amber-900/30 border border-amber-100 dark:border-amber-800 rounded-lg text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2 animate-in slide-in-from-top-2">
            <Info size={14} className="shrink-0 mt-0.5" />
            <span>Surge pricing is active due to increased demand in your area. Drivers are busier than usual.</span>
+        </div>
+      )}
+
+      {bargainPrice && (
+        <div className="mb-4 p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg text-xs text-purple-700 dark:text-purple-300 text-center font-bold">
+           Premium Member Price Unlocked!
         </div>
       )}
 
@@ -153,7 +172,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({
              onClick={(e) => { e.stopPropagation(); onBook(); }}
              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-sm active:scale-95 whitespace-nowrap ${isTeleport ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-900 dark:bg-blue-600 hover:bg-slate-700 dark:hover:bg-blue-700 text-white'}`}
           >
-             Book Now
+             {bargainPrice ? 'Accept Deal' : 'Book Now'}
           </button>
         </div>
       </div>

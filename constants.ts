@@ -1,5 +1,12 @@
 import { ServiceProvider, Quote, BusinessMetric, Restaurant } from './types';
 
+export const MOCK_RIDERS = [
+  { id: 'd1', name: 'David', lat: 37.7700, lng: -122.4100, rating: 4.9, load: 0, vehicle: 'eBike' },
+  { id: 'd2', name: 'Sarah', lat: 37.7800, lng: -122.4200, rating: 4.7, load: 1, vehicle: 'Scooter' },
+  { id: 'd3', name: 'Mike', lat: 37.7650, lng: -122.4150, rating: 4.5, load: 2, vehicle: 'Bike' },
+  { id: 'd4', name: 'Jenny', lat: 37.7760, lng: -122.4190, rating: 5.0, load: 0, vehicle: 'Moped' },
+];
+
 export const MOCK_QUOTES: Quote[] = [
   {
     id: '1',
@@ -30,11 +37,23 @@ export const MOCK_QUOTES: Quote[] = [
     provider: ServiceProvider.TELEPORT,
     price: 18.50,
     currency: 'USD',
-    eta: 10,
+    eta: 3, 
     vehicleType: 'Teleport Eco Van',
     ecoScore: 9,
     surged: false,
     category: 'eco',
+    canShare: true
+  },
+  {
+    id: '13',
+    provider: ServiceProvider.COMMUNITY,
+    price: 5.50,
+    currency: 'USD',
+    eta: 8,
+    vehicleType: 'Community Tricycle',
+    ecoScore: 8,
+    surged: false,
+    category: 'tricycle',
     canShare: true
   },
   {

@@ -3,7 +3,8 @@ export enum ServiceProvider {
   LYFT = 'Lyft',
   TELEPORT = 'Teleport Fleet',
   LIME = 'Lime',
-  METRO = 'City Metro'
+  METRO = 'City Metro',
+  COMMUNITY = 'Community Rides'
 }
 
 export enum ServiceType {
@@ -24,10 +25,11 @@ export interface Quote {
   vehicleType: string;
   ecoScore: number; // 1-10
   surged: boolean;
-  category: 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'bicycle' | 'van';
+  category: 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'bicycle' | 'van' | 'tricycle';
   canShare?: boolean;
   badges?: string[]; // For competitive advantage (Fastest, Cheapest)
   originalPrice?: number; // To show discounts
+  bargainPrice?: number; // For premium customer negotiation
 }
 
 export interface Restaurant {
@@ -67,7 +69,7 @@ export interface ChatMessage {
 }
 
 export type SortOption = 'price' | 'eta' | 'eco';
-export type VehicleFilter = 'all' | 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'van';
+export type VehicleFilter = 'all' | 'standard' | 'luxury' | 'delivery' | 'eco' | 'transit' | 'scooter' | 'water' | 'van' | 'tricycle';
 
 export interface User {
   name: string;
@@ -78,6 +80,7 @@ export interface User {
   currency: string;
   referralCode?: string;
   credits?: number;
+  isPremium?: boolean;
 }
 
 export interface WalletTransaction {
@@ -117,4 +120,13 @@ export interface Campaign {
   type: 'discount' | 'bonus' | 'communication';
   status: 'active' | 'scheduled' | 'ended';
   reach: number;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning';
+  read: boolean;
+  time: string;
 }
